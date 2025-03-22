@@ -3,6 +3,7 @@ import { db, collection, getDocs, addDoc, deleteDoc, doc, onSnapshot } from './f
 import topic from './topic.json';
 import HeartDisplay from './heart';
 import RevealNumbers from './RevealNumbers';
+import Cookies from 'js-cookie'; 
 
 const maxNumber = 100;
 
@@ -14,6 +15,19 @@ function App() {
   const [heart, setHeart] = useState(3);
 
   const [currentTopic, setCurrentTopic] = useState('');
+
+  useEffect(() => {
+    // ลองโหลดชื่อจาก cookies ถ้ามี
+    const savedUserName = Cookies.get('userName');
+    if (savedUserName) {
+      setUserName(savedUserName);
+    }
+  }, []);
+
+  const handleUserNameChange = (event) => {
+    setUserName(event.target.value);
+    Cookies.set('userName', event.target.value, { expires: 7 });
+  };
 
   const fetchUsedNumbers = async () => {
     setIsLoading(true);
@@ -276,7 +290,7 @@ function App() {
             <input
               value={userName}
               placeholder="กรอกชื่อ"
-              onChange={(event) => setUserName(event.target.value)}
+              onChange={handleUserNameChange} 
             />
             <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
