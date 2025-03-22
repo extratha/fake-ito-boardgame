@@ -53,7 +53,7 @@ const HeartDisplay = ({ heart, setHeart,handleReduceHeart, handleResetHeart, }) 
 
                 </div>
                 <button onClick={handleReduceHeart} disabled={heart < 1}>ลด 1 หัวใจ</button>
-                <button onClick={() => fetchHeart()}>fetch หัวใจ</button>
+                {/* <button onClick={() => fetchHeart()}>fetch หัวใจ</button> */}
                 <button style={{ marginTop: '2rem' }} onClick={handleResetHeart}>รีหัวใจ</button>
             </div>
         </div>

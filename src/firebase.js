@@ -7,8 +7,8 @@ const firebaseConfig = {
     projectId: "unique-number-931d0",
     storageBucket: "unique-number-931d0.firebasestorage.app",
     messagingSenderId: "769264750690",
-    appId: "1:769264750690:web:db835e6abab4e7dcda813b",
-    measurementId: "G-WXQQZEK1HS"
+    appId: "1:769264750690:web:36d2679b136b5801da813b",
+    measurementId: "G-TLR9Z95093"
 };
 
 const app = initializeApp(firebaseConfig);
