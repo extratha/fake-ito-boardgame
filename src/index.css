@@ -1,0 +1,26 @@
+html{ 
+  font-family: "Noto Sans Thai", sans-serif;
+}
+
+input {
+  font-family: "Noto Sans Thai", sans-serif;
+}
+button{ 
+  font-family: "Noto Sans Thai", sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans Thai", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: "Noto Sans Thai", sans-serif;
+}
+
+.wrapper {
+  justify-items: center;
+  margin: 2rem 0 0 0;
+}
