@@ -11,7 +11,6 @@ const maxNumber = 100;
 function App() {
   const [userName, setUserName] = useState('');
   const [myNumbers, setMyNumbers] = useState([]);
-  const [usedNumbers, setUsedNumbers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
   const [currentTopic, setCurrentTopic] = useState('');
@@ -25,77 +24,86 @@ function App() {
     setIsLoading(true);
     const db = getDatabase();
     const numbersRef = ref(db, 'numbers');
-    get(numbersRef).then((snapshot) => {
+  
+    try {
+      const snapshot = await get(numbersRef); // ใช้ await เพื่อให้ข้อมูลถูกดึงขึ้นมาก่อน
       if (snapshot.exists()) {
         const numbersData = snapshot.val();
         const numbers = Object.values(numbersData).map(item => item.number);
-        setUsedNumbers(numbers);
+        return numbers; // คืนค่า numbers ที่ได้จากฐานข้อมูล
       } else {
         console.log("No data available");
+        return []; // ถ้าไม่มีข้อมูล ก็ return เป็น array ว่าง
       }
-      setIsLoading(false);
-    }).catch((error) => {
+    } catch (error) {
       console.error(error);
+      return []; // ถ้าเกิด error ก็คืนค่า array ว่าง
+    } finally {
       setIsLoading(false);
-    });
+    }
   };
+  
 
   const generateRandomNumber = async () => {
-    await fetchUsedNumbers();
-    if (usedNumbers.length === maxNumber) {
+    const updatedUsedNumbers = await fetchUsedNumbers(); // ดึงเลขที่ใช้ไปแล้ว
+    setIsLoading(true)
+    if (updatedUsedNumbers?.length >= maxNumber) {
       alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
-      return;
+      return setIsLoading(false);
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     let randomNumber;
     do {
       randomNumber = Math.floor(Math.random() * maxNumber) + 1;
-    } while (usedNumbers.includes(randomNumber));
+    } while (updatedUsedNumbers.includes(randomNumber));
 
     setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
 
     const db = getDatabase();
     const numbersRef = ref(db, 'numbers');
     const newNumberRef = push(numbersRef);
-    set(newNumberRef, {
+    await set(newNumberRef, {
       number: randomNumber,
       timestamp: new Date().toISOString(),
     });
 
-    setUsedNumbers([...usedNumbers, randomNumber]);
-    setIsLoading(false)
-
+    setIsLoading(false);
   };
 
   const generateNextNumber = async () => {
-    await fetchUsedNumbers();
+    const updatedUsedNumbers = await fetchUsedNumbers();
+    setIsLoading(true);
+
     if (myNumbers.length >= 3) {
       alert('คุณสุ่มเลขครบแล้ว');
+      setIsLoading(false);
       return;
     }
-    if (usedNumbers.length === maxNumber) {
+
+    if (updatedUsedNumbers?.length >= maxNumber) {
       alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
+      setIsLoading(false);
       return;
     }
 
     let randomNumber;
     do {
-      randomNumber = Math.floor(Math.random() * maxNumber) + 1;
-    } while (usedNumbers.includes(randomNumber));
+      randomNumber = Math.floor(Math.random() * maxNumber) + 1; // ✅ Random 1-3
+    } while (updatedUsedNumbers.includes(randomNumber));
 
     setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
 
     const db = getDatabase();
     const numbersRef = ref(db, 'numbers');
     const newNumberRef = push(numbersRef);
-    set(newNumberRef, {
+    await set(newNumberRef, {
       number: randomNumber,
       timestamp: new Date().toISOString(),
     });
 
-    setUsedNumbers([...usedNumbers, randomNumber]);
+    setIsLoading(false);
   };
 
   const clearUsedNumbers = async () => {
@@ -105,10 +113,8 @@ function App() {
       const numbersRef = ref(db, 'numbers');
       remove(numbersRef)
         .then(() => {
-          setUsedNumbers([]);
           setMyNumbers([]);
           setIsLoading(false);
-          alert('เคลียร์เลขที่ใช้ไปแล้วเรียบร้อย!');
         })
         .catch((error) => {
           console.error(error);
@@ -162,7 +168,6 @@ function App() {
   const resetGameData = async () => {
     try {
       setMyNumbers([]);
-      setUsedNumbers([]);
 
       const db = getDatabase();
       const numbersRef = ref(db, 'numbers');
@@ -180,10 +185,10 @@ function App() {
   const handleClickNumber = async (number) => {
     const db = getDatabase();
     const revealNumbersRef = ref(db, 'revealNumbers');
-  
+
     get(revealNumbersRef).then((snapshot) => {
       console.log('Firebase Data:', snapshot.val(), 'Exists:', snapshot.exists());
-  
+
       if (!snapshot.exists()) {
         if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
           const newRevealRef = push(revealNumbersRef);
@@ -195,13 +200,13 @@ function App() {
         }
         return;
       }
-  
+
       const isNumberRevealed = Object.values(snapshot.val()).some((item) => item.number === number);
       if (isNumberRevealed) {
         alert('เลขนี้เคยถูกเปิดเผยแล้ว');
         return;
       }
-  
+
       if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
         const newRevealRef = push(revealNumbersRef);
         set(newRevealRef, {
@@ -214,7 +219,7 @@ function App() {
       console.error(error);
     });
   };
-  
+
   const handleResetHeart = () => {
     updateHeart(3);
   };
