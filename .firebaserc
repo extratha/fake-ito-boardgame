@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "unique-number-931d0"
-  }
+    "default": "fake-ito-boardgame-th",
+    "fake-ito-boardgame-th": "fake-ito-boardgame-th"
+  },
+  "targets": {},
+  "etags": {}
 }
