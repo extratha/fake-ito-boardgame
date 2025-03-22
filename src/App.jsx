@@ -1,28 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { db, collection, getDocs, addDoc, deleteDoc, doc, onSnapshot } from './firebase';
+import { getDatabase, ref, set, get, child, onValue, push, remove } from "firebase/database";
 import topic from './topic.json';
 import HeartDisplay from './heart';
 import RevealNumbers from './RevealNumbers';
-import Cookies from 'js-cookie'; 
+import Cookies from 'js-cookie';
+/* eslint-disable */
 
 const maxNumber = 100;
 
 function App() {
   const [userName, setUserName] = useState('');
   const [myNumbers, setMyNumbers] = useState([]);
-  const [usedNumbers, setUsedNumbers] = useState([]); // เก็บเลขที่ใช้ไปแล้ว
+  const [usedNumbers, setUsedNumbers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
-
   const [currentTopic, setCurrentTopic] = useState('');
-
-  useEffect(() => {
-    // ลองโหลดชื่อจาก cookies ถ้ามี
-    const savedUserName = Cookies.get('userName');
-    if (savedUserName) {
-      setUserName(savedUserName);
-    }
-  }, []);
 
   const handleUserNameChange = (event) => {
     setUserName(event.target.value);
@@ -31,46 +23,22 @@ function App() {
 
   const fetchUsedNumbers = async () => {
     setIsLoading(true);
-    const querySnapshot = await getDocs(collection(db, 'numbers'));
-    let numbers = [];
-    querySnapshot.forEach((doc) => {
-      numbers.push(doc.data().number); // เอาค่า number จากแต่ละ document
-    });
-    setUsedNumbers(numbers);
-    setIsLoading(false);
-  };
-
-  // Real-time listener for currentTopic using onSnapshot
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'topic'), (snapshot) => {
-      if (!snapshot.empty) {
-        const topicData = snapshot.docs[0].data();
-        setCurrentTopic(topicData.topic); // Update currentTopic with real-time data
+    const db = getDatabase();
+    const numbersRef = ref(db, 'numbers');
+    get(numbersRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        const numbersData = snapshot.val();
+        const numbers = Object.values(numbersData).map(item => item.number);
+        setUsedNumbers(numbers);
+      } else {
+        console.log("No data available");
       }
+      setIsLoading(false);
+    }).catch((error) => {
+      console.error(error);
+      setIsLoading(false);
     });
-
-    return () => {
-      unsubscribe(); // Cleanup the listener when the component unmounts
-    };
-  }, []);
-
-  useEffect(() => {
-    // Subscribe to real-time updates for the 'heart' collection
-    const unsubscribe = onSnapshot(collection(db, 'heart'), (snapshot) => {
-      // เมื่อข้อมูลใน collection 'heart' เปลี่ยนแปลง
-      snapshot.forEach((doc) => {
-        const heartData = doc.data();
-        setHeart(heartData.heart); // อัปเดตค่า heart ใน state
-      });
-    });
-
-    // Unsubscribe when component is unmounted
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    fetchUsedNumbers();
-  }, []);
+  };
 
   const generateRandomNumber = async () => {
     await fetchUsedNumbers();
@@ -79,25 +47,26 @@ function App() {
       return;
     }
 
-    let randomNumber;
+    setIsLoading(true)
 
-    // สุ่มเลขที่ยังไม่เคยใช้ (ไม่ซ้ำกัน)
+    let randomNumber;
     do {
-      randomNumber = Math.floor(Math.random() * maxNumber) + 1; // เปลี่ยนเป็น 1-100
+      randomNumber = Math.floor(Math.random() * maxNumber) + 1;
     } while (usedNumbers.includes(randomNumber));
 
     setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
 
-    // เพิ่มเลขที่สุ่มได้เข้าไปใน Firestore เพื่อบันทึกว่าใช้ไปแล้ว
-    try {
-      await addDoc(collection(db, 'numbers'), {
-        number: randomNumber,  // เก็บเลขที่สุ่มได้
-        timestamp: new Date(),  // เก็บเวลา
-      });
-      setUsedNumbers([...usedNumbers, randomNumber]); // เพิ่มเลขที่สุ่มได้ไปยัง array ของเลขที่ใช้แล้ว
-    } catch (e) {
-      console.error('Error adding document: ', e);
-    }
+    const db = getDatabase();
+    const numbersRef = ref(db, 'numbers');
+    const newNumberRef = push(numbersRef);
+    set(newNumberRef, {
+      number: randomNumber,
+      timestamp: new Date().toISOString(),
+    });
+
+    setUsedNumbers([...usedNumbers, randomNumber]);
+    setIsLoading(false)
+
   };
 
   const generateNextNumber = async () => {
@@ -112,95 +81,80 @@ function App() {
     }
 
     let randomNumber;
-
-    // สุ่มเลขที่ยังไม่เคยใช้ (ไม่ซ้ำกัน)
     do {
       randomNumber = Math.floor(Math.random() * maxNumber) + 1;
     } while (usedNumbers.includes(randomNumber));
 
     setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
 
-    // เพิ่มเลขที่สุ่มได้เข้าไปใน Firestore
-    try {
-      await addDoc(collection(db, 'numbers'), {
-        number: randomNumber,
-        timestamp: new Date(),
-      });
-      setUsedNumbers([...usedNumbers, randomNumber]);
-    } catch (e) {
-      console.error('Error adding document: ', e);
-    }
+    const db = getDatabase();
+    const numbersRef = ref(db, 'numbers');
+    const newNumberRef = push(numbersRef);
+    set(newNumberRef, {
+      number: randomNumber,
+      timestamp: new Date().toISOString(),
+    });
+
+    setUsedNumbers([...usedNumbers, randomNumber]);
   };
 
   const clearUsedNumbers = async () => {
-    /* eslint-disable no-restricted-globals */
     if (confirm('ยืนยันจะเคลียร์ที่ทุกคนสุ่มไปแล้วไหม')) {
       setIsLoading(true);
-      const querySnapshot = await getDocs(collection(db, 'numbers'));
-      querySnapshot.forEach(async (doc) => {
-        await deleteDoc(doc.ref); // ลบทุก document ใน collection
-      });
-      setUsedNumbers([]); // เคลียร์เลขที่ใช้ไปแล้วใน state
-      setMyNumbers([]);
-      setIsLoading(false);
-
-      alert('เคลียร์เลขที่ใช้ไปแล้วเรียบร้อย!');
+      const db = getDatabase();
+      const numbersRef = ref(db, 'numbers');
+      remove(numbersRef)
+        .then(() => {
+          setUsedNumbers([]);
+          setMyNumbers([]);
+          setIsLoading(false);
+          alert('เคลียร์เลขที่ใช้ไปแล้วเรียบร้อย!');
+        })
+        .catch((error) => {
+          console.error(error);
+          setIsLoading(false);
+        });
     }
   };
 
   const clearMyNumbers = async () => {
     if (confirm('คุณต้องการเคลียร์เลขที่เคยสุ่มไปแล้วใช่หรือไม่?')) {
       setIsLoading(true);
-
-      // ดึงข้อมูลเลขทั้งหมดจาก Firestore
-      const querySnapshot = await getDocs(collection(db, 'numbers'));
-
-      querySnapshot.forEach(async (doc) => {
-        const numberData = doc.data().number;
-
-        // ถ้าเลขนั้นมีอยู่ใน myNumbers, ลบจาก Firestore
-        if (myNumbers.includes(numberData)) {
-          await deleteDoc(doc.ref);
+      const db = getDatabase();
+      const numbersRef = ref(db, 'numbers');
+      get(numbersRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          snapshot.forEach(async (childSnapshot) => {
+            const numberData = childSnapshot.val();
+            if (myNumbers.includes(numberData.number)) {
+              remove(childSnapshot.ref);
+            }
+          });
         }
+        setMyNumbers([]);
+        setIsLoading(false);
+        alert('เคลียร์เลขที่สุ่มไปแล้วเรียบร้อย!');
+      }).catch((error) => {
+        console.error(error);
+        setIsLoading(false);
       });
-
-      // เคลียร์เลขที่เก็บไว้ใน state
-      setMyNumbers([]);
-      setIsLoading(false);
-      alert('เคลียร์เลขที่สุ่มไปแล้วเรียบร้อย!');
     }
   };
 
   const handleRandomTopic = async () => {
     if (confirm('สุ่มหัวข้อใหม่เท่ากับเริ่มเกมใหม่ ยืนยันหรือไม่')) {
       setIsLoading(true);
-
       await resetGameData();
 
-      // สุ่มหัวข้อใหม่จากไฟล์ JSON
       const randomTopic = topic.data[Math.floor(Math.random() * topic.data.length)];
 
-      // ตรวจสอบว่า Firestore มีหัวข้อแล้วหรือไม่
-      const topicSnapshot = await getDocs(collection(db, 'topic'));
-
-      if (!topicSnapshot.empty) {
-        // ถ้ามีหัวข้อแล้ว ลบหัวข้อเดิมทิ้ง
-        topicSnapshot.forEach(async (doc) => {
-          await deleteDoc(doc.ref);  // ลบ document ที่มีอยู่
-        });
-      }
-
-      // เพิ่มหัวข้อใหม่ลงใน Firestore
-      try {
-        await addDoc(collection(db, 'topic'), {
-          topic: randomTopic,  // เก็บหัวข้อที่สุ่มได้
-          timestamp: new Date(),  // เก็บเวลา
-        });
-        setCurrentTopic(randomTopic);  // ตั้งค่าหัวข้อที่สุ่มได้ให้กับ state
-      } catch (e) {
-        console.error('Error adding topic to Firestore: ', e);
-      }
-
+      const db = getDatabase();
+      const topicRef = ref(db, 'topic');
+      set(topicRef, {
+        topic: randomTopic,
+        timestamp: new Date().toISOString(),
+      });
+      setCurrentTopic(randomTopic);
       setIsLoading(false);
     }
   };
@@ -210,46 +164,57 @@ function App() {
       setMyNumbers([]);
       setUsedNumbers([]);
 
-      const numbersSnapshot = await getDocs(collection(db, 'numbers'));
-      numbersSnapshot.forEach(async (doc) => {
-        await deleteDoc(doc.ref);  // ลบเลขที่ใช้ไปแล้ว
-      });
+      const db = getDatabase();
+      const numbersRef = ref(db, 'numbers');
+      remove(numbersRef);
 
-      const revealNumbersSnapshot = await getDocs(collection(db, 'revealNumbers'));
-      revealNumbersSnapshot.forEach(async (doc) => {
-        await deleteDoc(doc.ref);  // ลบข้อมูลใน revealNumbers
-      });
+      const revealNumbersRef = ref(db, 'revealNumbers');
+      remove(revealNumbersRef);
 
-      await fetchUsedNumbers(); // เคลียร์เลขที่ใช้ไปแล้วใน state
-
+      await fetchUsedNumbers();
     } catch (e) {
       console.error('Error resetting game data: ', e);
     }
   };
 
   const handleClickNumber = async (number) => {
-    // ดึงข้อมูลทั้งหมดจาก Firestore
-    const revealNumbersSnapshot = await getDocs(collection(db, 'revealNumbers'));
-    
-    // ตรวจสอบว่าเลขนี้มีอยู่ใน revealNumbers หรือไม่
-    const isNumberRevealed = revealNumbersSnapshot.docs.some(doc => doc.data().number === number);
-    
-    if (isNumberRevealed) {
-      // ถ้าเลขนี้เคยถูกเปิดเผยแล้ว, ไม่ทำอะไร
-      alert('เลขนี้เคยถูกเปิดเผยแล้ว');
-      return;
-    }
+    const db = getDatabase();
+    const revealNumbersRef = ref(db, 'revealNumbers');
   
-    // ถ้าไม่ได้เคยเปิดเผย, ให้แสดง confirm และเพิ่มข้อมูลลง Firestore
-    if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
-      await addDoc(collection(db, 'revealNumbers'), {
-        number,
-        userName,
-        timestamp: new Date(),
-      });
-    }
-  }
-
+    get(revealNumbersRef).then((snapshot) => {
+      console.log('Firebase Data:', snapshot.val(), 'Exists:', snapshot.exists());
+  
+      if (!snapshot.exists()) {
+        if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
+          const newRevealRef = push(revealNumbersRef);
+          set(newRevealRef, {
+            number,
+            userName,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+  
+      const isNumberRevealed = Object.values(snapshot.val()).some((item) => item.number === number);
+      if (isNumberRevealed) {
+        alert('เลขนี้เคยถูกเปิดเผยแล้ว');
+        return;
+      }
+  
+      if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
+        const newRevealRef = push(revealNumbersRef);
+        set(newRevealRef, {
+          number,
+          userName,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }).catch((error) => {
+      console.error(error);
+    });
+  };
+  
   const handleResetHeart = () => {
     updateHeart(3);
   };
@@ -261,24 +226,55 @@ function App() {
   };
 
   const updateHeart = async (newHeart) => {
-    setHeart(newHeart); // อัปเดตค่า heart ใน state
-
-    // ตรวจสอบว่า Firestore มีค่า heart หรือไม่
-    const heartSnapshot = await getDocs(collection(db, 'heart'));
-
-    if (!heartSnapshot.empty) {
-      // ถ้ามีอยู่แล้ว ให้ลบค่าก่อนแล้วเพิ่มใหม่
-      heartSnapshot.forEach(async (doc) => {
-        await deleteDoc(doc.ref);
-      });
-    }
-
-    // เพิ่มค่าใหม่ลง Firestore
-    await addDoc(collection(db, 'heart'), {
+    const db = getDatabase();
+    const heartRef = ref(db, 'heart');
+    set(heartRef, {
       heart: newHeart,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     });
+    setHeart(newHeart);
   };
+
+  useEffect(() => {
+    const savedUserName = Cookies.get('userName');
+    if (savedUserName) {
+      setUserName(savedUserName);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsedNumbers();
+  }, []);
+
+  useEffect(() => {
+    const db = getDatabase();
+    const heartRef = ref(db, 'heart');
+    const unsubscribe = onValue(heartRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const heartData = snapshot.val();
+        setHeart(heartData.heart);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const db = getDatabase();
+    const topicRef = ref(db, 'topic');
+    const unsubscribe = onValue(topicRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const topicData = snapshot.val();
+        setCurrentTopic(topicData.topic);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="App">
@@ -290,7 +286,7 @@ function App() {
             <input
               value={userName}
               placeholder="กรอกชื่อ"
-              onChange={handleUserNameChange} 
+              onChange={handleUserNameChange}
             />
             <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -315,8 +311,8 @@ function App() {
                   <div style={{ display: 'flex', gap: '14px' }}>
                     {myNumbers.map((value) => (
                       <h1
-                        onClick={()=>handleClickNumber(value)}
-                        style={{ margin: '0 0 16px', cursor:'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)`  }} >
+                        onClick={() => handleClickNumber(value)}
+                        style={{ margin: '0 0 16px', cursor: 'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)` }} >
                         {value}
                       </h1>
                     ))}
@@ -329,7 +325,7 @@ function App() {
             </div>
 
             <HeartDisplay heart={heart} setHeart={setHeart} handleReduceHeart={handleReduceHeart} handleResetHeart={handleResetHeart} />
-            <RevealNumbers/>
+            <RevealNumbers />
           </div>
         }
       </div>

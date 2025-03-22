@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { getDatabase, set, get, onValue, remove } from "firebase/database";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAjq0jaRQ8pQfak-zXNf0jXgF5x1g4rqc0",
     authDomain: "fake-ito-boardgame-th.firebaseapp.com",
     projectId: "fake-ito-boardgame-th",
+    databaseURL: "https://fake-ito-boardgame-th-default-rtdb.firebaseio.com", 
     storageBucket: "fake-ito-boardgame-th.firebasestorage.app",
     messagingSenderId: "36323179426",
     appId: "1:36323179426:web:a88809a21713dd7612d0fb",
@@ -12,6 +13,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = getDatabase(app);
 
-export { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot }
+export { db, set, get, onValue, remove };
