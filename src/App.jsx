@@ -4,6 +4,7 @@ import topic from './topic.json';
 import HeartDisplay from './heart';
 import RevealNumbers from './RevealNumbers';
 import Cookies from 'js-cookie';
+import RuleDetail from './RuleDetail';
 /* eslint-disable */
 
 const maxNumber = 100;
@@ -347,6 +348,8 @@ function App() {
           <h3> ...LOADING...</h3>
           :
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+            <RuleDetail />
+
             <input
               value={userName}
               placeholder="กรอกชื่อ"
