@@ -31,6 +31,8 @@ function App() {
       if (snapshot.exists()) {
         const topicsArray = Object.values(snapshot.val()); // ได้เป็น array ของหัวข้อทั้งหมด
         const latestTopic = topicsArray[topicsArray.length - 1]?.topic || ''; // เอาหัวข้อสุดท้าย
+        console.log("จำนวนหัวข้อทั้งหมด", topicMaxLength, "สุ่มไปแล้ว", topicsArray.length)
+
         setCurrentTopic(latestTopic);
         return topicsArray.map(item => item.topic); // คืนค่าหัวข้อทั้งหมด
       }
@@ -209,7 +211,7 @@ function App() {
   };
 
   const clearUsedTopics = async () => {
-    if (confirm('ยืนยันจะเคลียร์หัวข้อทั้งหมดหรือไม่?')) {
+    if (confirm('ยืนยันจะเคลียร์หัวข้อที่เคยสุ่มแล้วหรือไม่?')) {
       setIsLoading(true);
       const db = getDatabase();
       const topicRef = ref(db, 'topic');
@@ -327,7 +329,7 @@ function App() {
     const topicRef = ref(db, "topic");
 
     const unsubscribe = onValue(topicRef, (snapshot) => {
-        if (snapshot.exists()) {
+      if (snapshot.exists()) {
         const topicData = Object.values(snapshot.val()); // แปลง Object เป็น Array
         const latestTopic = topicData
           .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
@@ -351,9 +353,9 @@ function App() {
               onChange={handleUserNameChange}
             />
             <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <button onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                <button onClick={clearUsedTopics} >เคลียร์หัวข้อ</button>
+                <button onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
               </div>
 
               <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>
