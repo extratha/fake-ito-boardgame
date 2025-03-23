@@ -7,6 +7,7 @@ import Cookies from 'js-cookie';
 /* eslint-disable */
 
 const maxNumber = 100;
+const topicMaxLength = topic.data.length
 
 function App() {
   const [userName, setUserName] = useState('');
@@ -20,11 +21,33 @@ function App() {
     Cookies.set('userName', event.target.value, { expires: 7 });
   };
 
+  const fetchUsedTopics = async () => {
+    setIsLoading(true);
+    const db = getDatabase();
+    const topicRef = ref(db, 'topic');
+
+    try {
+      const snapshot = await get(topicRef);
+      if (snapshot.exists()) {
+        const topicsArray = Object.values(snapshot.val()); // ได้เป็น array ของหัวข้อทั้งหมด
+        const latestTopic = topicsArray[topicsArray.length - 1]?.topic || ''; // เอาหัวข้อสุดท้าย
+        setCurrentTopic(latestTopic);
+        return topicsArray.map(item => item.topic); // คืนค่าหัวข้อทั้งหมด
+      }
+      return [];
+    } catch (error) {
+      console.error(error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const fetchUsedNumbers = async () => {
     setIsLoading(true);
     const db = getDatabase();
     const numbersRef = ref(db, 'numbers');
-  
+
     try {
       const snapshot = await get(numbersRef); // ใช้ await เพื่อให้ข้อมูลถูกดึงขึ้นมาก่อน
       if (snapshot.exists()) {
@@ -42,7 +65,7 @@ function App() {
       setIsLoading(false);
     }
   };
-  
+
 
   const generateRandomNumber = async () => {
     const updatedUsedNumbers = await fetchUsedNumbers(); // ดึงเลขที่ใช้ไปแล้ว
@@ -152,18 +175,50 @@ function App() {
       setIsLoading(true);
       await resetGameData();
 
-      const randomTopic = topic.data[Math.floor(Math.random() * topic.data.length)];
+      try {
+        const usedTopics = await fetchUsedTopics()
 
-      const db = getDatabase();
-      const topicRef = ref(db, 'topic');
-      set(topicRef, {
-        topic: randomTopic,
-        timestamp: new Date().toISOString(),
-      });
-      setCurrentTopic(randomTopic);
+        if (usedTopics.length >= topicMaxLength) {
+          alert('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่');
+          setIsLoading(false);
+          return;
+        }
+
+        let randomTopic;
+        do {
+          randomTopic = topic.data[Math.floor(Math.random() * topic.data.length)];
+        } while (usedTopics.includes(randomTopic)); // สุ่มใหม่ถ้าซ้ำ
+
+        const db = getDatabase();
+        const topicRef = ref(db, 'topic');
+
+        const newUsedTopicRef = push(topicRef);
+
+        await set(newUsedTopicRef, {
+          topic: randomTopic,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(usedTopics)
+        setCurrentTopic(randomTopic);
+      } catch (error) {
+        console.error("Error fetching topics:", error);
+      }
       setIsLoading(false);
     }
   };
+
+  const clearUsedTopics = async () => {
+    if (confirm('ยืนยันจะเคลียร์หัวข้อทั้งหมดหรือไม่?')) {
+      setIsLoading(true);
+      const db = getDatabase();
+      const topicRef = ref(db, 'topic');
+      await remove(topicRef);
+      setCurrentTopic('');
+      setIsLoading(false);
+    }
+  };
+
 
   const resetGameData = async () => {
     try {
@@ -248,6 +303,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    fetchUsedTopics();
     fetchUsedNumbers();
   }, []);
 
@@ -281,6 +337,19 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const db = getDatabase();
+    const topicRef = ref(db, 'topic');
+    const unsubscribe = onValue(topicRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const topicData = snapshot.val();
+        setCurrentTopic(topicData.topic);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="App">
       <div className='wrapper'>
@@ -296,6 +365,7 @@ function App() {
             <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
+                <button onClick={clearUsedTopics} >เคลียร์หัวข้อ</button>
               </div>
 
               <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>

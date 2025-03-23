@@ -14,8 +14,6 @@ const RevealNumbers = () => {
         const data = snapshot.val();
         const revealNumbersData = Object.values(data);
 
-        console.log("ก่อน sort:", revealNumbersData);
-
         setRevealNumbers(revealNumbersData);
       } else {
         setRevealNumbers([]);
