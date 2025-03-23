@@ -324,26 +324,14 @@ function App() {
 
   useEffect(() => {
     const db = getDatabase();
-    const topicRef = ref(db, 'topic');
-    const unsubscribe = onValue(topicRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const topicData = snapshot.val();
-        setCurrentTopic(topicData.topic);
-      }
-    });
+    const topicRef = ref(db, "topic");
 
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    const db = getDatabase();
-    const topicRef = ref(db, 'topic');
     const unsubscribe = onValue(topicRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const topicData = snapshot.val();
-        setCurrentTopic(topicData.topic);
+        if (snapshot.exists()) {
+        const topicData = Object.values(snapshot.val()); // แปลง Object เป็น Array
+        const latestTopic = topicData
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+        setCurrentTopic(latestTopic?.topic || '');
       }
     });
 
