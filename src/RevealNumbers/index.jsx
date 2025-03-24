@@ -1,13 +1,13 @@
-import { db } from "./firebase"; // Assuming your db is already initialized properly
+import { db } from "../firebase"; // Assuming your db is already initialized properly
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
 
-const RevealNumbers = () => {
+const RevealNumbers = ({roomId}) => {
 
   const [revealNumbers, setRevealNumbers] = useState([]);
 
   useEffect(() => {
-    const revealNumbersRef = ref(db, 'revealNumbers');
+    const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
 
     const unsubscribe = onValue(revealNumbersRef, (snapshot) => {
       if (snapshot.exists()) {

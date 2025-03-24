@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getDatabase, ref, set, onValue } from 'firebase/database';
 
-const HeartDisplay = ({ isLoading }) => {
+const HeartDisplay = ({roomId, isLoading }) => {
   const [heart, setHeart] = useState(3); // เริ่มต้นที่ 3 หัวใจ
   const db = getDatabase();
 
   // ใช้ onValue เพื่อติดตามการเปลี่ยนแปลงใน Realtime Database
   useEffect(() => {
-    const heartRef = ref(db, 'heart');
+    const heartRef = ref(db, `rooms/${roomId}/heart`);
     const unsubscribe = onValue(heartRef, (snapshot) => {
       if (snapshot.exists()) {
         const heartData = snapshot.val();
