@@ -89,20 +89,23 @@ const WelcomePage = () => {
 
   return (
     <div style={{ width: "180px", padding: '3rem 1rem 0', display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: 'auto', gap: '8px' }}>
+      <p style={{fontWeight:600, fontSize: '24px'}}>Fake Ito Board Game</p>
       <p style={{ margin: 0 }}>ชื่อผู่เล่น:</p>
       <input
         value={userName}
         placeholder="ระบุชื่อผู้เล่น"
         onChange={handleUserNameChange}
       />
-      <h1>เข้าร่วมห้อง</h1>
+      <p style={{fontWeight:500, fontSize: '24px' , margin: "16px 0 0"}}>เข้าร่วมห้อง</p>
+      <p style={{ margin: 0 }}>เลขที่ห้อง:</p>
       <input
         value={roomId}
         onChange={(e) => setRoomId(e.target.value)}
         placeholder="รหัสห้อง"
       />
       <button onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
-      <button style={{ marginTop: '2rem' }} onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+      <p style={{fontWeight:500, fontSize: '20px', margin: '2rem 0 0', textAlign:'center'}}>หรือ</p>
+      <button onClick={handleCreateRoom}>สร้างห้องใหม่</button>
     </div>
   );
 };
