@@ -52,7 +52,7 @@ const RevealNumbers = ({roomId}) => {
             position: index === 0 ? 'fixed' : 'default',
             alignItems: 'center',
             gap: '8px',
-            background: 'white',
+            background: 'rgb(48, 48, 48)',
             boxShadow: '1px 1px 4px 1px rgba(0,0,0,0.45)'
           }}>
             <RevealedNumber data={revealedData.userName} />

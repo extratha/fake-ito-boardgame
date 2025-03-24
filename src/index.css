@@ -1,5 +1,6 @@
 html{ 
   font-family: "Noto Sans Thai", sans-serif;
+  background-color: rgb(26, 25, 24);
 }
 
 input {
@@ -24,3 +25,8 @@ code {
   justify-items: center;
   padding: 1.5rem 0 2rem 0 ;
 }
+
+p,h1,h2,h3{
+  color: rgb(242, 243, 243)
+}
+

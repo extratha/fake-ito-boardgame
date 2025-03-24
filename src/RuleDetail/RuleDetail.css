@@ -7,7 +7,7 @@
     }
 
     .rule-button {
-        color: rgb(15, 83, 24);
+        color: rgb(157, 179, 160);
         border: none;
         padding: 8px 16px;
         cursor: pointer;
@@ -33,7 +33,7 @@
     .popup-content {
         display: flex;
         flex-direction: column;
-        background-color: white;
+        background-color: rgb(48, 48, 48);
         padding: 30px;
         border-radius: 10px;
         max-width: 500px;
@@ -50,15 +50,11 @@
     .close-button {
         width: 100px;
         margin-left: auto;
-        background-color: #f44336;
+        border: 2px solid #a1b39a;
         color: white;
-        border: none;
+        background: transparent;
         padding: 10px 20px;
         cursor: pointer;
         border-radius: 5px;
         margin-top: 20px;
-    }
-
-    .close-button:hover {
-        background-color: #e53935;
     }

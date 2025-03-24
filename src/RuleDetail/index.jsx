@@ -48,7 +48,7 @@ const RuleDetail = () => {
             <p> หากหัวใจหมด เริ่มเกมใหม่</p>
             <p> จำนวนเลขที่แต่ละคนสุ่ม รอบแรกจะสุ่มคนละเลข หากจบเกมรอบแรกโดยหัวใจยังไม่หมด สามารถเริ่มรอบต่อไปโดยเพิ่มเลขที่สุ่มเป็นคนละสองเลข สามารถเพิ่มถึงสามเลขด้วยเงื่อนไขเดียวกัน </p>
 
-            <button className="close-button" onClick={togglePopup}>Close</button>
+            <button className="close-button" onClick={togglePopup}>รับแซ่บ</button>
           </div>
         </div>
       )}

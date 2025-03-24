@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, set, get, onValue, push, remove } from "firebase/database";
+import { getDatabase, ref, set, get, onValue, push, remove, runTransaction } from "firebase/database";
 import topic from '../constant/topic.json';
 import HeartDisplay from '../Heart';
 import RevealNumbers from '../RevealNumbers';
@@ -312,14 +312,10 @@ function MainPage() {
     }
   };
 
-  const updateHeart = async (roomId, heartChange) => {
+  const updateHeart = async (heartChange) => {
     const db = getDatabase();
     const heartRef = ref(db, `rooms/${roomId}/heart`);
-
-    const snapshot = await get(heartRef);
-    const currentHeart = snapshot.exists() ? snapshot.val() : 0;
-
-    await set(heartRef, currentHeart + heartChange);
+    await set(heartRef, heartChange)
   };
 
   useEffect(() => {
@@ -340,7 +336,7 @@ function MainPage() {
     const unsubscribe = onValue(heartRef, (snapshot) => {
       if (snapshot.exists()) {
         const heartData = snapshot.val();
-        setHeart(heartData.heart);
+        setHeart(heartData);
       }
     });
 
@@ -382,7 +378,7 @@ function MainPage() {
 
   useEffect(() => {
     if (userName) {
-      checkIfUserIsHost();  
+      checkIfUserIsHost();
     }
   }, [userName, roomId]);
 
@@ -392,14 +388,14 @@ function MainPage() {
         {isLoading ?
           <h3> ...LOADING...</h3>
           :
-          <div style={{ padding:"0 1rem", display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-            <div style={{display: 'flex' ,gap: '8px', alignItems:'center',}}> <h2 style={{ margin:'0'}}> ห้อง: </h2>
-            <h2 style={{margin: '0'}}>{roomId}</h2>
+          <div style={{ padding: "0 1rem", display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', }}> <h2 style={{ margin: '0' }}> ห้อง: </h2>
+              <h2 style={{ margin: '0' }}>{roomId}</h2>
             </div>
-            
+
             <RuleDetail />
 
-           
+
             <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <button onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
@@ -437,7 +433,7 @@ function MainPage() {
               {isHost && <button onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
             </div>
 
-            <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} handleReduceHeart={handleReduceHeart} handleResetHeart={handleResetHeart} />
+            <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
             <RevealNumbers roomId={roomId} />
           </div>
         }
