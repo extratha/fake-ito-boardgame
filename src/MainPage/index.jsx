@@ -6,6 +6,10 @@ import RevealNumbers from '../RevealNumbers';
 import Cookies from 'js-cookie';
 import RuleDetail from '../RuleDetail';
 import { useNavigate, useParams } from 'react-router';
+import CopyIcon from "../icons/copy.svg";
+import CopiedIcon from "../icons/copied.svg";
+
+import '../App.css'
 /* eslint-disable */
 
 const maxNumber = 100;
@@ -18,6 +22,7 @@ function MainPage() {
   const [heart, setHeart] = useState(3);
   const [currentTopic, setCurrentTopic] = useState('');
   const [isHost, setIsHost] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const navigate = useNavigate();
   const { roomId } = useParams();
@@ -318,6 +323,14 @@ function MainPage() {
     await set(heartRef, heartChange)
   };
 
+  const copyToClipboard = () => {
+    if (roomId) {
+      navigator.clipboard.writeText(roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
   useEffect(() => {
     const savedUserName = Cookies.get('userName');
     if (savedUserName) {
@@ -388,53 +401,78 @@ function MainPage() {
         {isLoading ?
           <h3> ...LOADING...</h3>
           :
-          <div style={{ padding: "0 1rem", display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', }}> <h2 style={{ margin: '0' }}> ห้อง: </h2>
-              <h2 style={{ margin: '0' }}>{roomId}</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '0 12px' }} >
+              <button className="button-common" onClick={() => navigate(-1)}>ย้อนกลับ</button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', }}>
+                <h2 style={{ margin: '0' }}> ห้อง: </h2>
+                <h2 style={{ margin: '0' }}>{roomId}</h2>
+                {roomId && (
+                  <button onClick={copyToClipboard} style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center"
+                  }}>
+                    {copied ? <img src={CopiedIcon} alt="copy" /> : <img src={CopyIcon} alt="copy" />}
+                  </button>
+                )}
+              </div>
+              <RuleDetail />
             </div>
 
-            <RuleDetail />
-
-
-            <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                <button onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>
-                <p style={{ margin: "0", fontSize: '22px', fontWeight: '500' }}> หัวข้อ: </p>
-                <h2 style={{ margin: "0" }}> {currentTopic}</h2>
-              </div>
-            </div>
-
-            <div style={{ width: "100%", display: 'flex', flexDirection: 'column', gap: "16px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
-              <h2 style={{ margin: "8px" }}>สุ่มเลข 1-{maxNumber}</h2>
-
-              <button style={{ width: "120px" }} disabled={myNumbers.length >= 1} onClick={generateRandomNumber}>สุ่มเลข</button>
-              {myNumbers.length > 0 && myNumbers.length < 3 && <button onClick={generateNextNumber}>สุ่มอีกเลข</button>}
-
-              {myNumbers &&
-                <div style={{ display: 'flex', flexDirection: "column", gap: "16px", alignItems: 'center' }}>
-                  <h1 style={{ margin: "16px 0 0", color: myNumbers.length > 0 ? 'default' : 'transparent' }}>เลขที่ออก</h1>
-                  <div style={{ display: 'flex', gap: '14px' }}>
-                    {myNumbers.map((value) => (
-                      <h1
-                        onClick={() => handleClickNumber(value)}
-                        style={{ margin: '0 0 16px', cursor: 'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)` }} >
-                        {value}
-                      </h1>
-                    ))}
-                  </div>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <button className="button-common" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
+                  <button className="button-common" onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
                 </div>
-              }
 
-              <button onClick={clearMyNumbers}>เคลียร์เลขของตัวเอง</button>
-              {isHost && <button onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
+                <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>
+                  <p style={{ margin: "0", fontSize: '22px', fontWeight: '500' }}> หัวข้อ: </p>
+                  <h2 style={{ margin: "0" }}> {currentTopic}</h2>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: "16px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
+                <h2 style={{ margin: "8px" }}>สุ่มเลข 1-{maxNumber}</h2>
+
+                <button className="button-common" style={{ width: "120px" }} disabled={myNumbers.length >= 1} onClick={generateRandomNumber}>สุ่มเลข</button>
+                {myNumbers.length > 0 && myNumbers.length < 3 && <button className="button-common" onClick={generateNextNumber}>สุ่มอีกเลข</button>}
+
+                {myNumbers &&
+                  <div style={{ display: 'flex', flexDirection: "column", gap: "16px", alignItems: 'center' }}>
+                    <h2 style={{ margin: "16px 0 0", color: myNumbers.length > 0 ? 'default' : 'transparent' }}>เลขที่ออก</h2>
+                    <div style={{ display: 'flex', gap: '14px' }}>
+                      {myNumbers.map((value) => (
+                        <h1
+                          onClick={() => handleClickNumber(value)}
+                          style={{
+                            width:'79px',
+                            margin: '0 0 16px', cursor: 'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)`,
+                            borderRadius: "8px",
+                            boxShadow: "2px 2px 5px rgb(0, 0, 0)",
+                            padding: "8px 12px",
+                            display: "inline-block",
+                            background: "rgb(44, 44, 44)",
+                          }}
+                        >
+                          {value}
+                        </h1>
+                      ))}
+                    </div>
+                  </div>
+                }
+
+                <button className="button-common" onClick={clearMyNumbers}>เคลียร์เลขของตัวเอง</button>
+                {isHost && <button className="button-common" onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
+              </div>
+
+              <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+              <RevealNumbers roomId={roomId} />
             </div>
 
-            <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
-            <RevealNumbers roomId={roomId} />
           </div>
         }
       </div>

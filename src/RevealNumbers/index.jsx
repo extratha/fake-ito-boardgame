@@ -2,7 +2,7 @@ import { db } from "../firebase"; // Assuming your db is already initialized pro
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
 
-const RevealNumbers = ({roomId}) => {
+const RevealNumbers = ({ roomId }) => {
 
   const [revealNumbers, setRevealNumbers] = useState([]);
 
@@ -23,14 +23,14 @@ const RevealNumbers = ({roomId}) => {
     return () => unsubscribe();
   }, []);
 
-  const RevealedNumber = ({ data , styles}) => <p style={{ margin: '0', fontSize: '16px', fontWeight: 500,...styles }}>{data}</p>;
+  const RevealedNumber = ({ data, styles }) => <p style={{ margin: '0', fontSize: '16px', fontWeight: 500, ...styles }}>{data}</p>;
 
   return (
     <div style={{
       minWidth: "100px",
       height: '82vh',
       padding: "6px",
-      overflow:'auto', 
+      overflow: 'auto',
       position: 'fixed',
       display: 'flex',
       flexDirection: 'column',
@@ -46,17 +46,19 @@ const RevealNumbers = ({roomId}) => {
             width: "80px",
             padding: "8px",
             borderRadius: "8px",
-            marginTop: index === 1 ? "80px":'none',
+            marginTop: index === 1 ? "80px" : 'none',
             display: 'flex',
             flexDirection: 'column',
             position: index === 0 ? 'fixed' : 'default',
             alignItems: 'center',
             gap: '8px',
-            background: 'rgb(48, 48, 48)',
-            boxShadow: '1px 1px 4px 1px rgba(0,0,0,0.45)'
+            background: "rgb(44, 44, 44)",
+            boxShadow: "2px 2px 5px rgb(0, 0, 0)",
+            padding: "8px 12px",
+            display: "inline-block",
           }}>
             <RevealedNumber data={revealedData.userName} />
-            <RevealedNumber data={revealedData.number} styles={{ color: `hsl(${200 - ((revealedData.number - 1) * 2)}, 100%, 40%)`}}  />
+            <RevealedNumber data={revealedData.number} styles={{ color: `hsl(${200 - ((revealedData.number - 1) * 2)}, 100%, 40%)` }} />
           </div>
         ))}
     </div>

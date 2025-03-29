@@ -1,4 +1,5 @@
 
+import '../App.css'
 const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart, onResetHeart }) => {
 
   const handleReduceHeart = async () => {
@@ -10,7 +11,7 @@ const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart, onResetHeart }) 
   };
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: '16px' }}>
+    <div style={{  display: 'flex', flexDirection: 'column', alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: '16px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
         <div style={{ margin: '1rem 0 0.5rem', display: 'flex', gap: '8px' }}>
           <>
@@ -28,8 +29,8 @@ const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart, onResetHeart }) 
             ))}
           </>
         </div>
-        <button onClick={handleReduceHeart} disabled={heart < 1}>ลด 1 หัวใจ</button>
-        <button style={{ marginTop: '2rem' }} onClick={handleResetHeart}>รีหัวใจ</button>
+        <button className="button-common" onClick={handleReduceHeart} disabled={heart < 1}>ลด 1 หัวใจ</button>
+        <button className="button-common"style={{ marginTop: '1rem' }} onClick={handleResetHeart}>รีหัวใจ</button>
       </div>
     </div>
   );

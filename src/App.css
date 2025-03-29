@@ -28,11 +28,23 @@
   color: #61dafb;
 }
 
-
 .wrapper {
   justify-items: center;
-  margin: 2rem 0 0 0;
-  position:"relative"
+  margin: 1rem 0 0 0;
+}
+
+.button-common {
+  padding: 6px 12px;
+  background: rgb(235, 235, 235);
+  box-shadow: 1px 1px 2px 0px rgb(2, 2, 2);
+  border-radius: 4px;
+  border: 0px;
+  cursor: pointer;
+}
+.button-common:active {
+  box-shadow: 0px 0px 0px 0px rgb(2, 2, 2); /* ทำให้ดูจมลง */
+  transform: translateY(1px); /* ทำให้ปุ่มกดลงไป */
+  background: rgb(220, 220, 220); /* เปลี่ยนสีให้ดูมีมิติ */
 }
 
 @keyframes App-logo-spin {

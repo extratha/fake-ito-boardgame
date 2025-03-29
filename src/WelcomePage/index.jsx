@@ -103,9 +103,9 @@ const WelcomePage = () => {
         onChange={(e) => setRoomId(e.target.value)}
         placeholder="รหัสห้อง"
       />
-      <button onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
+      <button className="button-common"  onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
       <p style={{fontWeight:500, fontSize: '20px', margin: '2rem 0 0', textAlign:'center'}}>หรือ</p>
-      <button onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+      <button className="button-common"  onClick={handleCreateRoom}>สร้างห้องใหม่</button>
     </div>
   );
 };
