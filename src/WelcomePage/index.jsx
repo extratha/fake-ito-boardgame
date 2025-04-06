@@ -97,6 +97,7 @@ const WelcomePage = () => {
         onChange={handleUserNameChange}
       />
       <p style={{fontWeight:500, fontSize: '24px' , margin: "16px 0 0"}}>เข้าร่วมห้อง</p>
+      
       <p style={{ margin: 0 }}>เลขที่ห้อง:</p>
       <input
         value={roomId}
