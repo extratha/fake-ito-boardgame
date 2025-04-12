@@ -10,6 +10,7 @@ import CopyIcon from "../icons/copy.svg";
 import CopiedIcon from "../icons/copied.svg";
 
 import '../App.css'
+import NameModal from '../NameModal';
 /* eslint-disable */
 
 const maxNumber = 100;
@@ -23,6 +24,7 @@ function MainPage() {
   const [currentTopic, setCurrentTopic] = useState('');
   const [isHost, setIsHost] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
 
   const navigate = useNavigate();
   const { roomId } = useParams();
@@ -335,6 +337,8 @@ function MainPage() {
     const savedUserName = Cookies.get('userName');
     if (savedUserName) {
       setUserName(savedUserName);
+    } else {
+      setShowNameModal(true);
     }
   }, []);
 
@@ -449,7 +453,7 @@ function MainPage() {
                         <h1
                           onClick={() => handleClickNumber(value)}
                           style={{
-                            width:'79px',
+                            width: '79px',
                             margin: '0 0 16px', cursor: 'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)`,
                             borderRadius: "8px",
                             boxShadow: "2px 2px 5px rgb(0, 0, 0)",
@@ -473,6 +477,9 @@ function MainPage() {
               <RevealNumbers roomId={roomId} />
             </div>
 
+            {
+              showNameModal && <NameModal userName={userName} setUserName={setUserName} setShowNameModal={setShowNameModal} />
+            }
           </div>
         }
       </div>
