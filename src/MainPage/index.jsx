@@ -333,6 +333,10 @@ function MainPage() {
     }
   };
 
+  const handleClickBack = () => {
+    navigate("/")
+  }
+
   useEffect(() => {
     const savedUserName = Cookies.get('userName');
     if (savedUserName) {
@@ -407,7 +411,7 @@ function MainPage() {
           :
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '0 12px' }} >
-              <button className="button-common" onClick={() => navigate(-1)}>ย้อนกลับ</button>
+              <button className="button-common" onClick={() => handleClickBack()}>ย้อนกลับ</button>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', }}>
                 <h2 style={{ margin: '0' }}> ห้อง: </h2>
                 <h2 style={{ margin: '0' }}>{roomId}</h2>
