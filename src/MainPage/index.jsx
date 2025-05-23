@@ -427,7 +427,7 @@ function MainPage() {
                   </button>
                 )}
               </div>
-              <RuleDetail />
+              {/* <RuleDetail /> */}
             </div>
 
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', }}>
