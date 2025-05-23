@@ -434,7 +434,7 @@ function MainPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <button className="button-common" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                  <button className="button-common" onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
+                  {isHost &&<button className="button-common" onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button> }
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>
