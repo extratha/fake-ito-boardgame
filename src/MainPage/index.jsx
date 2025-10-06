@@ -318,6 +318,12 @@ function MainPage() {
       updateHeart(heart - 1);
     }
   };
+   const handleAddHeart = () => {
+    if (heart < 3) {
+      updateHeart(heart + 1);
+    }
+  };
+
 
   const updateHeart = async (heartChange) => {
     const db = getDatabase();
@@ -477,7 +483,7 @@ function MainPage() {
                 {isHost && <button className="button-common" onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
               </div>
 
-              <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+              <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onAddHeart={handleAddHeart} onResetHeart={handleResetHeart} />
               <RevealNumbers roomId={roomId} />
             </div>
 

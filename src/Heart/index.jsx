@@ -1,9 +1,12 @@
 
 import '../App.css'
-const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart, onResetHeart }) => {
+const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart,onAddHeart, onResetHeart }) => {
 
   const handleReduceHeart = async () => {
     onReduceHeart()
+  };
+   const handleAddHeart = async () => {
+    onAddHeart()
   };
 
   const handleResetHeart = () => {
@@ -30,6 +33,7 @@ const HeartDisplay = ({ roomId, heart, setHeart, onReduceHeart, onResetHeart }) 
           </>
         </div>
         <button className="button-common" onClick={handleReduceHeart} disabled={heart < 1}>ลด 1 หัวใจ</button>
+        <button className="button-common" onClick={handleAddHeart} disabled={heart < 1}>เพิ่ม 1 หัวใจ</button>
         <button className="button-common"style={{ marginTop: '1rem' }} onClick={handleResetHeart}>รีหัวใจ</button>
       </div>
     </div>
