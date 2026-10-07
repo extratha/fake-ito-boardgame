@@ -284,42 +284,44 @@
   transform: scale(0.85);
 }
 
-/* ติดขอบล่างจอจนกว่าจะ scroll ถึงตำแหน่งจริง แล้วอยู่ที่เดิมตามปกติ */
+/* ติดขอบล่างจอจนกว่าจะ scroll ถึงตำแหน่งจริง แล้วอยู่ที่เดิมตามปกติ
+   ขนาดการ์ดต้องเท่าเดิมทุกสถานะ: ถ้าย่อตอนติดขอบ sentinel จะเลื่อนแล้วสลับสถานะวนจนกระพริบ */
 .heart-card {
   position: sticky;
   bottom: calc(8px + env(safe-area-inset-bottom));
   z-index: 4;
-  transition: padding 150ms ease;
-}
-
-.heart-card.is-stuck {
   flex-direction: row;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-color: rgba(239, 68, 68, 0.35);
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+  gap: 8px 12px;
+  padding: 10px 12px;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
 }
 
-.heart-card.is-stuck .hearts {
-  gap: 2px;
+.heart-card .hearts {
+  gap: 4px;
 }
 
-.heart-card.is-stuck .heart {
-  width: 28px;
-  height: 28px;
+.heart-card .heart {
+  width: 32px;
+  height: 32px;
 }
 
-.heart-card.is-stuck .button-row {
+.heart-card .button-row {
   flex-wrap: nowrap;
   gap: 8px;
 }
 
-.heart-card.is-stuck .button-common {
-  min-height: 40px;
-  padding: 6px 12px;
-  font-size: 14px;
+.heart-card .button-common {
+  padding: 8px 14px;
+  font-size: 15px;
   white-space: nowrap;
+}
+
+/* ตอนติดขอบเปลี่ยนแค่สิ่งที่ไม่กระทบ layout */
+.heart-card.is-stuck {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* sentinel สูง 0 และหักล้าง gap ของ .stack ไม่ให้เกิดช่องว่างเพิ่ม */
@@ -738,4 +740,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ===== Notice ===== */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 6px 10px 14px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: var(--radius-md);
+  background: rgba(251, 191, 36, 0.1);
+  text-align: left;
+}
+
+.notice p {
+  flex: 1;
+  margin: 6px 0;
+  font-size: 15px;
+}
+
+.notice strong {
+  color: var(--color-primary);
+  letter-spacing: 0.05em;
 }

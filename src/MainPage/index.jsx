@@ -235,7 +235,8 @@ function MainPage() {
     setRoomExists(false);
     withTimeout(get(ref(db, roomPath)), 'check room').then((snapshot) => {
       if (!snapshot.exists()) {
-        navigate("/");
+        // ห้องถูกลบไปแล้ว (เช่น ลิงก์เก่า): กลับ lobby พร้อมบอกว่าห้องไหนหาย ให้ lobby โหลดรายชื่อห้องใหม่
+        navigate("/", { replace: true, state: { missingRoomId: roomId } });
       } else {
         setRoomExists(true);
       }

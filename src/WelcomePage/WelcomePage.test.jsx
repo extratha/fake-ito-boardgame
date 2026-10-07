@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Cookies from 'js-cookie';
 import * as fakeDb from '../testUtils/fakeDatabase';
@@ -10,11 +10,13 @@ jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
 jest.mock('../Dialog/dialogStore', () => ({ showAlert: jest.fn() }));
 const mockNavigate = jest.fn();
-jest.mock('react-router', () => ({ useNavigate: () => mockNavigate }));
+let mockLocation = { pathname: '/', state: null };
+jest.mock('react-router', () => ({ useNavigate: () => mockNavigate, useLocation: () => mockLocation }));
 
 beforeEach(() => {
   fakeDb.__reset();
   mockNavigate.mockReset();
+  mockLocation = { pathname: '/', state: null };
   Cookies.set('userName', 'Alice');
   Cookies.set('clientId', 'client-alice');
   showAlert.mockReset();
@@ -91,4 +93,29 @@ test('กดเข้าห้องจากรายชื่อห้อง�
   render(<WelcomePage />);
   userEvent.click(screen.getByRole('button', { name: 'เข้าห้อง K7QM' }));
   expect(mockNavigate).toHaveBeenCalledWith('/room/K7QM');
+});
+
+test('เด้งมาจากห้องที่ถูกลบ: แสดงข้อความ, โหลดรายชื่อห้องจาก server ใหม่ และล้าง state ไม่ให้โผล่ซ้ำตอน reload', async () => {
+  fakeDb.__reset({ roomIndex: { K7QM: { hostName: 'Bob', online: { b: 'Bob' } } } });
+  mockLocation = { pathname: '/', state: { missingRoomId: 'GONE' } };
+  const getSpy = jest.spyOn(fakeDb, 'get');
+  render(<WelcomePage />);
+
+  expect(screen.getByRole('status')).toHaveTextContent('ไม่พบห้อง GONE แล้ว');
+  expect(mockNavigate).toHaveBeenCalledWith('.', { replace: true, state: null });
+  // cleanupRooms อ่าน roomIndex 1 ครั้งอยู่แล้ว + refetch เพราะห้องหาย อีก 1 ครั้ง
+  const roomIndexReads = () => getSpy.mock.calls.filter(([r]) => r.path === 'roomIndex').length;
+  await waitFor(() => expect(roomIndexReads()).toBe(2));
+  expect(screen.getByRole('button', { name: 'เข้าห้อง K7QM' })).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole('button', { name: 'ปิดข้อความ' }));
+  expect(screen.queryByText(/ไม่พบห้อง GONE/)).not.toBeInTheDocument();
+});
+
+test('เข้า lobby ปกติไม่มีข้อความห้องหาย และไม่ refetch ซ้ำ', async () => {
+  const getSpy = jest.spyOn(fakeDb, 'get');
+  render(<WelcomePage />);
+  expect(screen.queryByText(/ไม่พบห้อง/)).not.toBeInTheDocument();
+  await act(async () => {});
+  expect(getSpy.mock.calls.filter(([r]) => r.path === 'roomIndex')).toHaveLength(1);
 });

@@ -1,6 +1,6 @@
 import { getDatabase, ref, update, get, serverTimestamp } from "firebase/database";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import Cookies from 'js-cookie';
 import { withTimeout, reportDbError } from "../utils/connection";
 import { showAlert } from "../Dialog/dialogStore";
@@ -38,6 +38,9 @@ const WelcomePage = () => {
   const [roomId, setRoomId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  // ถูกเด้งกลับมาจากห้องที่ไม่มีแล้ว (ลิงก์เก่า)
+  const [missingRoomId, setMissingRoomId] = useState(location.state?.missingRoomId || '');
 
   const handleUserNameChange = (event) => {
     setUserName(event.target.value)
@@ -88,6 +91,14 @@ const WelcomePage = () => {
     cleanupRooms(); // ลบห้องที่ร้างเกิน 10 นาที / อายุเกิน 1 วัน
   }, []);
 
+  useEffect(() => {
+    const missing = location.state?.missingRoomId;
+    if (!missing) return;
+    setMissingRoomId(missing);
+    // ล้าง state ออกจาก history ไม่ให้ข้อความโผล่อีกตอน reload
+    navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
+
   return (
     <div className="wrapper">
       <div className="stack welcome">
@@ -113,7 +124,16 @@ const WelcomePage = () => {
           </label>
         </section>
 
-        <OnlineRooms onJoin={joinRoom} />
+        {missingRoomId && (
+          <div className="notice" role="status">
+            <p>ไม่พบห้อง <strong>{missingRoomId}</strong> แล้ว (อาจถูกลบเพราะไม่มีคนอยู่) เลือกห้องที่เล่นอยู่ด้านล่าง หรือสร้างห้องใหม่ได้เลย</p>
+            <button className="icon-button" onClick={() => setMissingRoomId('')} aria-label="ปิดข้อความ">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
+        )}
+
+        <OnlineRooms onJoin={joinRoom} refreshToken={missingRoomId} />
 
         <section className="card">
           <h2 className="card-title">เข้าร่วมห้อง</h2>

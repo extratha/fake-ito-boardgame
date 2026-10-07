@@ -142,7 +142,7 @@ describe('presence & host', () => {
   test('ห้องที่ไม่มีอยู่จริงจะไม่ถูกสร้างจากการลงชื่อ', async () => {
     fakeDb.__reset({ '.info': { connected: true } });
     render(<MainPage />);
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true, state: { missingRoomId: 'room1' } }));
     expect(fakeDb.__getData('rooms')).toBeNull();
   });
 

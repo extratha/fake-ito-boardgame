@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import '../App.css'
 
 // section นี้เป็น position: sticky (bottom) ติดขอบล่างจอจนกว่าจะ scroll ถึงตำแหน่งจริง
-// ใช้ sentinel ที่อยู่ถัดลงไปดูว่าตอนนี้ "ติดขอบ" อยู่ไหม เพื่อย่อให้เป็นแถบเตี้ย ๆ
+// ใช้ sentinel ที่อยู่ถัดลงไปดูว่าตอนนี้ "ติดขอบ" อยู่ไหม เพื่อใส่เงา (ห้ามเปลี่ยนขนาด ไม่งั้นจะสลับสถานะวนจนกระพริบ)
 const HeartDisplay = ({ heart, onReduceHeart, onResetHeart }) => {
   const [isStuck, setIsStuck] = useState(false);
   const sentinelRef = useRef(null);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, get } from 'firebase/database';
 import { db } from '../firebase';
+import { withTimeout } from '../utils/connection';
 
 // รายชื่อห้องที่มีคนออนไลน์ อ่านจาก roomIndex อย่างเดียว (ไม่โหลดข้อมูลเกม/แชทของห้อง)
 export const toOnlineRooms = (index) =>
@@ -14,13 +15,21 @@ export const toOnlineRooms = (index) =>
     .filter((room) => room.players.length > 0)
     .sort((a, b) => b.players.length - a.players.length || b.lastSeen - a.lastSeen);
 
-const OnlineRooms = ({ onJoin }) => {
+// refreshToken เปลี่ยน = ดึงจาก server ใหม่อีกรอบ (นอกเหนือจาก listener realtime)
+const OnlineRooms = ({ onJoin, refreshToken }) => {
   const [rooms, setRooms] = useState([]);
 
   useEffect(() => {
     const unsubscribe = onValue(ref(db, 'roomIndex'), (snapshot) => setRooms(toOnlineRooms(snapshot.val())));
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!refreshToken) return;
+    withTimeout(get(ref(db, 'roomIndex')), 'refresh online rooms')
+      .then((snapshot) => setRooms(toOnlineRooms(snapshot.val())))
+      .catch((error) => console.error('[db] refresh online rooms failed:', error));
+  }, [refreshToken]);
 
   return (
     <section className="card">

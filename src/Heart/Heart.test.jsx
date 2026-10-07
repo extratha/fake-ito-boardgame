@@ -13,7 +13,7 @@ afterEach(() => { delete window.IntersectionObserver; });
 
 const card = () => screen.getByText('ลด 1 หัวใจ').closest('section');
 
-test('ยังไม่ scroll ถึง (sentinel อยู่ใต้จอ) = ติดขอบล่างแบบย่อ, scroll ถึงแล้ว = อยู่ที่เดิม', () => {
+test('ยังไม่ scroll ถึง (sentinel อยู่ใต้จอ) = สถานะติดขอบ, scroll ถึงแล้ว = อยู่ที่เดิม', () => {
   render(<HeartDisplay heart={2} onReduceHeart={() => {}} onResetHeart={() => {}} />);
   expect(card()).toHaveClass('heart-card');
 
