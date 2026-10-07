@@ -396,7 +396,6 @@
   font-size: 30px;
   font-weight: 600;
   color: var(--color-primary);
-  text-shadow: 0 3px 0 var(--color-primary-shade);
 }
 
 .welcome-dice {
