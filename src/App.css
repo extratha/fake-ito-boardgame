@@ -284,35 +284,96 @@
   transform: scale(0.85);
 }
 
+/* ติดขอบล่างจอจนกว่าจะ scroll ถึงตำแหน่งจริง แล้วอยู่ที่เดิมตามปกติ */
+.heart-card {
+  position: sticky;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 4;
+  transition: padding 150ms ease;
+}
+
+.heart-card.is-stuck {
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.heart-card.is-stuck .hearts {
+  gap: 2px;
+}
+
+.heart-card.is-stuck .heart {
+  width: 28px;
+  height: 28px;
+}
+
+.heart-card.is-stuck .button-row {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.heart-card.is-stuck .button-common {
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* sentinel สูง 0 และหักล้าง gap ของ .stack ไม่ให้เกิดช่องว่างเพิ่ม */
+.heart-sentinel {
+  height: 0;
+  margin-top: -16px;
+}
+
 /* ===== Reveal panel ===== */
 .reveal-panel {
-  position: fixed;
-  top: 96px; /* อยู่ใต้ header ไม่บังปุ่มย้อนกลับ/ป้าย host */
-  left: 8px;
+  position: fixed; /* top/left/right มาจาก inline style (ลากย้ายได้) */
   z-index: 5;
   display: flex;
   flex-direction: column;
   width: 112px;
-  max-height: calc(100vh - 112px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  transition: width 200ms var(--ease-out);
+  transition: width 200ms var(--ease-out), top 200ms var(--ease-out);
 }
 
 .reveal-panel.is-collapsed {
   width: auto;
 }
 
+.reveal-panel.is-dragging {
+  transition: none;
+  opacity: 0.9;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+
 .reveal-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2px;
-  padding: 2px 2px 2px 10px;
+  gap: 4px;
+  padding: 2px 2px 2px 8px;
+  cursor: grab;
+  touch-action: none; /* ลากบนมือถือแล้วหน้าไม่ scroll ตาม */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.reveal-panel.is-dragging .reveal-panel-header {
+  cursor: grabbing;
+}
+
+.reveal-grip {
+  flex: none;
+  color: var(--color-muted);
+  opacity: 0.6;
 }
 
 .reveal-panel-title {
@@ -327,8 +388,14 @@
   transition: transform 200ms var(--ease-out);
 }
 
-.reveal-panel.is-collapsed .reveal-toggle .chevron {
+/* ลูกศรชี้ไปทางขอบจอตอนกาง (= พับเข้าขอบ) และชี้ออกตอนพับ */
+.reveal-panel.is-collapsed .reveal-toggle .chevron,
+.reveal-panel.is-right .reveal-toggle .chevron {
   transform: rotate(180deg);
+}
+
+.reveal-panel.is-right.is-collapsed .reveal-toggle .chevron {
+  transform: none;
 }
 
 .reveal-list {

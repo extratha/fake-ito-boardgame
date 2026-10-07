@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react';
 import * as fakeDb from '../testUtils/fakeDatabase';
-import ConnectionStatus from '.';
+import ConnectionStatus, { HIDE_CONNECTED_AFTER_MS } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
@@ -45,4 +45,18 @@ test('เคยต่อได้แล้วหลุด โชว์กำล�
 
   act(() => fakeDb.__write('.info/connected', true));
   expect(screen.getByRole('status')).toHaveTextContent('ออนไลน์');
+});
+
+test('ออนไลน์แล้วซ่อนป้ายหลังผ่านไปครู่หนึ่ง แต่ถ้าหลุดจะโชว์อีกครั้ง', () => {
+  render(<ConnectionStatus />);
+  act(() => fakeDb.__write('.info/connected', true));
+  expect(screen.getByRole('status')).toHaveTextContent('ออนไลน์');
+
+  act(() => jest.advanceTimersByTime(HIDE_CONNECTED_AFTER_MS));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+  act(() => fakeDb.__write('.info/connected', false));
+  expect(screen.getByRole('status')).toHaveTextContent('การเชื่อมต่อหลุด');
+  act(() => jest.advanceTimersByTime(HIDE_CONNECTED_AFTER_MS * 2));
+  expect(screen.getByRole('status')).toHaveTextContent('การเชื่อมต่อหลุด');
 });

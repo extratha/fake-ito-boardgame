@@ -1,6 +1,6 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import * as fakeDb from '../testUtils/fakeDatabase';
-import RevealNumbers from '.';
+import RevealNumbers, { DEFAULT_PANEL_POSITION, PANEL_POSITION_KEY, snapSide } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
@@ -43,4 +43,79 @@ test('ปุ่มซ่อน/แสดง panel เลขที่เปิด
 
   act(() => screen.getByRole('button', { name: 'แสดงเลขที่เปิดแล้ว' }).click());
   expect(screen.getByText('Alice')).toBeInTheDocument();
+});
+
+describe('drag', () => {
+  const header = () => screen.getByTitle('ลากเพื่อย้ายไปชิดซ้าย/ขวา');
+  const panel = () => screen.getByRole('complementary', { name: 'เลขที่เปิดแล้ว' });
+  const drag = (from, to) => {
+    fireEvent.pointerDown(header(), { pointerId: 1, button: 0, clientX: from[0], clientY: from[1] });
+    fireEvent.pointerMove(header(), { pointerId: 1, clientX: to[0], clientY: to[1] });
+    fireEvent.pointerUp(header(), { pointerId: 1, clientX: to[0], clientY: to[1] });
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    fakeDb.__reset({ rooms: { room1: { revealNumbers: { '-k1': { number: 10, userName: 'Alice' } } } } });
+    window.innerWidth = 400;
+    window.innerHeight = 800;
+  });
+
+  test('เริ่มต้นชิดซ้าย ใต้ header', () => {
+    render(<RevealNumbers roomId="room1" />);
+    expect(panel().style.left).toBe('8px');
+    expect(panel().style.top).toBe(`${DEFAULT_PANEL_POSITION.top}px`);
+  });
+
+  test('ลากไปครึ่งขวาแล้วปล่อย ชิดขวา, ลากกลับครึ่งซ้าย ชิดซ้าย และจำตำแหน่งไว้', () => {
+    const { unmount } = render(<RevealNumbers roomId="room1" />);
+    drag([20, 100], [300, 400]);
+    expect(panel()).toHaveClass('is-right');
+    expect(panel().style.right).toBe('8px');
+    expect(panel().style.left).toBe('');
+    expect(panel().style.top).toBe('300px'); // jsdom: panel เริ่มที่ top 0 แล้วลากลง 300
+    expect(JSON.parse(localStorage.getItem(PANEL_POSITION_KEY))).toEqual({ side: 'right', top: 300 });
+
+    unmount();
+    render(<RevealNumbers roomId="room1" />);
+    expect(panel().style.right).toBe('8px'); // เปิดใหม่ยังอยู่ที่เดิม
+
+    drag([380, 400], [100, 200]);
+    expect(panel()).not.toHaveClass('is-right');
+    expect(panel().style.left).toBe('8px');
+  });
+
+  test('ระหว่างลาก panel ตามนิ้ว และไม่หลุดขอบจอ', () => {
+    render(<RevealNumbers roomId="room1" />);
+    fireEvent.pointerDown(header(), { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(header(), { pointerId: 1, clientX: 150, clientY: 5000 });
+    expect(panel()).toHaveClass('is-dragging');
+    expect(panel().style.left).toBe('150px');
+    expect(parseInt(panel().style.top, 10)).toBeLessThanOrEqual(800);
+    fireEvent.pointerUp(header(), { pointerId: 1, clientX: 150, clientY: 5000 });
+    expect(parseInt(panel().style.top, 10)).toBeLessThanOrEqual(800 - 60);
+  });
+
+  test('แตะปุ่ม (ขยับไม่ถึง threshold) ยังพับ/กางได้ และการลากไม่ไปพับ panel', () => {
+    render(<RevealNumbers roomId="room1" />);
+    const toggle = screen.getByRole('button', { name: 'ซ่อนเลขที่เปิดแล้ว' });
+    fireEvent.pointerDown(toggle, { pointerId: 1, button: 0, clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(toggle, { pointerId: 1, clientX: 52, clientY: 51 });
+    fireEvent.pointerUp(toggle, { pointerId: 1, clientX: 52, clientY: 51 });
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'แสดงเลขที่เปิดแล้ว' })).toBeInTheDocument();
+
+    const toggle2 = screen.getByRole('button', { name: 'แสดงเลขที่เปิดแล้ว' });
+    fireEvent.pointerDown(toggle2, { pointerId: 1, button: 0, clientX: 50, clientY: 50 });
+    fireEvent.pointerMove(toggle2, { pointerId: 1, clientX: 300, clientY: 300 });
+    fireEvent.pointerUp(toggle2, { pointerId: 1, clientX: 300, clientY: 300 });
+    fireEvent.click(toggle2); // click ที่ตามมาหลังลาก ต้องไม่ toggle
+    expect(screen.getByRole('button', { name: 'แสดงเลขที่เปิดแล้ว' })).toBeInTheDocument();
+  });
+});
+
+test('snapSide ใช้จุดกลาง panel เทียบกับครึ่งจอ', () => {
+  expect(snapSide(0, 100, 400)).toBe('left');
+  expect(snapSide(149, 100, 400)).toBe('left');
+  expect(snapSide(151, 100, 400)).toBe('right');
 });

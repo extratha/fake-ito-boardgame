@@ -346,7 +346,7 @@ function MainPage() {
             </section>
 
             <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
-            <HeartDisplay roomId={roomId} heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <HeartDisplay heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
             <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
             <RevealNumbers roomId={roomId} />
           </div>
