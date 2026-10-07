@@ -129,9 +129,11 @@ describe('presence & host', () => {
     expect(fakeDb.__getData(`${ROOM}/players/${ME}`)).toMatchObject({ name: 'Alice', online: true });
     expect(fakeDb.__getData(`${ROOM}/players/${ME}/joinedAt`)).toEqual(expect.any(Number));
     expect(fakeDb.__getData('roomIndex/room1/lastSeen')).toEqual(expect.any(Number));
+    expect(fakeDb.__getData(`roomIndex/room1/online/${ME}`)).toBe('Alice');
 
     act(() => fakeDb.__disconnect());
     expect(fakeDb.__getData(`${ROOM}/players/${ME}/online`)).toBe(false);
+    expect(fakeDb.__getData('roomIndex/room1/online')).toBeNull();
   });
 
   test('ห้องที่ไม่มีอยู่จริงจะไม่ถูกสร้างจากการลงชื่อ', async () => {
@@ -176,6 +178,7 @@ describe('presence & host', () => {
     await act(async () => { jest.advanceTimersByTime(200); });
     await waitFor(() => expect(fakeDb.__getData(`${ROOM}/hostId`)).toBe(ME));
     expect(fakeDb.__getData(`${ROOM}/host`)).toBe('Bob');
+    expect(fakeDb.__getData('roomIndex/room1/hostName')).toBe('Bob');
     expect(screen.getByText('คุณเป็น host')).toBeInTheDocument();
   });
 

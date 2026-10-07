@@ -33,7 +33,7 @@ test('สร้างห้องสำเร็จแล้วไปหน้�
   expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^/room/[${ROOM_ID_CHARS}]{4}$`)));
   const [roomId, room] = Object.entries(fakeDb.__getData('rooms'))[0];
   expect(room).toMatchObject({ host: 'Alice', hostId: 'client-alice', heart: 3, settings: { numbersPerPlayer: 1 } });
-  expect(fakeDb.__getData(`roomIndex/${roomId}`)).toEqual({ createdAt: expect.any(Number), lastSeen: expect.any(Number) });
+  expect(fakeDb.__getData(`roomIndex/${roomId}`)).toEqual({ createdAt: expect.any(Number), lastSeen: expect.any(Number), hostName: 'Alice' });
 });
 
 test('DB ต่อไม่ได้: ปุ่มขึ้นกำลังสร้างห้อง แล้วแจ้ง error เมื่อหมดเวลา แทนการเงียบ', async () => {
@@ -82,4 +82,11 @@ test('เข้าห้องด้วยรหัส 4 ตัวพิมพ�
   userEvent.type(screen.getByPlaceholderText('รหัสห้อง 4 ตัว'), 'ab3d');
   userEvent.click(screen.getByText('เข้าร่วมห้อง', { selector: 'button' }));
   expect(mockNavigate).toHaveBeenCalledWith('/room/AB3D');
+});
+
+test('กดเข้าห้องจากรายชื่อห้องในหน้า lobby', () => {
+  fakeDb.__reset({ roomIndex: { K7QM: { hostName: 'Bob', online: { b: 'Bob' } } } });
+  render(<WelcomePage />);
+  userEvent.click(screen.getByRole('button', { name: 'เข้าห้อง K7QM' }));
+  expect(mockNavigate).toHaveBeenCalledWith('/room/K7QM');
 });

@@ -628,3 +628,47 @@
   flex: 1;
   min-width: 0;
 }
+
+/* ===== Lobby room list ===== */
+.room-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.room-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.room-item-id {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+}
+
+.room-item-meta {
+  font-size: 14px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

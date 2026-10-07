@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ref, onValue, runTransaction, set } from 'firebase/database';
+import { ref, onValue, runTransaction, update } from 'firebase/database';
 import { db } from '../firebase';
 import { pickHostCandidate } from '../utils/roomData';
 
@@ -10,6 +10,7 @@ export const useHost = ({ roomPath, clientId, userName, players }) => {
   const [hostId, setHostId] = useState(null);
   const [hostName, setHostName] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
+  const roomId = roomPath.split('/').pop();
 
   useEffect(() => {
     const unsubscribeId = onValue(ref(db, `${roomPath}/hostId`), (snapshot) => {
@@ -46,7 +47,7 @@ export const useHost = ({ roomPath, clientId, userName, players }) => {
         const result = await runTransaction(ref(db, `${roomPath}/hostId`), (current) =>
           (current ?? null) === (hostId ?? null) ? clientId : undefined);
         if (result.committed) {
-          await set(ref(db, `${roomPath}/host`), userName);
+          await update(ref(db), { [`${roomPath}/host`]: userName, [`roomIndex/${roomId}/hostName`]: userName });
           console.info('[room] you are now the host');
         }
       } catch (error) {
@@ -54,7 +55,7 @@ export const useHost = ({ roomPath, clientId, userName, players }) => {
       }
     }, delay);
     return () => clearTimeout(timer);
-  }, [isLoaded, players, hostId, hostName, clientId, userName, roomPath]);
+  }, [isLoaded, players, hostId, hostName, clientId, userName, roomPath, roomId]);
 
   const displayName = players.find((p) => p.id === hostId)?.name || hostName;
   return { hostId, hostName: displayName, isHost: Boolean(hostId) && hostId === clientId };

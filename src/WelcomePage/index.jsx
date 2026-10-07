@@ -5,6 +5,7 @@ import Cookies from 'js-cookie';
 import { withTimeout, reportDbError } from "../utils/connection";
 import { getClientId } from "../utils/clientId";
 import { cleanupRooms } from "../utils/roomCleanup";
+import OnlineRooms from "../OnlineRooms";
 
 // รหัสห้อง 4 ตัว: ตัวพิมพ์ใหญ่ + ตัวเลข ตัดตัวที่หน้าตาคล้ายกัน (0/O, 1/I/L) ออก ให้บอกกันปากเปล่าได้
 export const ROOM_ID_LENGTH = 4;
@@ -58,7 +59,7 @@ const WelcomePage = () => {
           settings: { numbersPerPlayer: 1 },
           createdAt: serverTimestamp(),
         },
-        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp() },
+        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp(), hostName: userName },
       }), 'create room');
       navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
     } catch (error) {
@@ -68,11 +69,13 @@ const WelcomePage = () => {
     }
   };
 
-  const handleJoinRoom = () => {
+  const joinRoom = (targetRoomId) => {
     if (!userName) return alert('กรุณาระบุชื่อผู้เล่น')
-    if (!roomId) return alert('กรุณากรอกรหัสห้อง');
-    navigate(`/room/${normalizeRoomId(roomId)}`); // ไปยังห้องที่ป้อนรหัส
+    if (!targetRoomId) return alert('กรุณากรอกรหัสห้อง');
+    navigate(`/room/${normalizeRoomId(targetRoomId)}`); // ไปยังห้องที่ป้อนรหัส
   };
+
+  const handleJoinRoom = () => joinRoom(roomId);
 
   const initUsername = () => {
     const value = Cookies.get('userName')
@@ -108,6 +111,8 @@ const WelcomePage = () => {
             />
           </label>
         </section>
+
+        <OnlineRooms onJoin={joinRoom} />
 
         <section className="card">
           <h2 className="card-title">เข้าร่วมห้อง</h2>
