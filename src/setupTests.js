@@ -3,3 +3,12 @@
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
+
+// react-router v7 ต้องใช้ TextEncoder ซึ่ง jsdom ของ jest 27 ไม่มี
+import { TextEncoder, TextDecoder } from 'util';
+Object.assign(global, { TextEncoder, TextDecoder });
+
+// jsdom ของ jest 27 ไม่มี Web Crypto (ใช้สุ่มรหัสห้อง)
+if (!global.crypto?.getRandomValues) {
+  Object.defineProperty(global, 'crypto', { value: require('crypto').webcrypto });
+}

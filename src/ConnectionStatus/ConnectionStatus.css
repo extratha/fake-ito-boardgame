@@ -1,0 +1,61 @@
+.connection-status {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+.connection-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+
+.is-connected {
+  color: var(--color-muted);
+}
+
+.is-connected .connection-dot {
+  background: #22c55e;
+}
+
+.is-connecting .connection-dot,
+.is-disconnected .connection-dot {
+  background: var(--color-primary);
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+.is-disconnected,
+.is-unreachable {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.is-unreachable .connection-dot {
+  background: var(--color-danger);
+}
+
+.connection-retry {
+  min-height: 36px;
+  padding: 2px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-display);
+  cursor: pointer;
+}

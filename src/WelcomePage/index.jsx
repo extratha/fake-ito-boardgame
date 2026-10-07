@@ -1,11 +1,15 @@
-import { getDatabase, push, ref, set, serverTimestamp, get, remove } from "firebase/database";
+import { getDatabase, ref, update, serverTimestamp } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
+import { withTimeout, reportDbError } from "../utils/connection";
+import { getClientId } from "../utils/clientId";
+import { cleanupRooms } from "../utils/roomCleanup";
 
 const WelcomePage = () => {
   const [userName, setUserName] = useState('');
   const [roomId, setRoomId] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
 
   const handleUserNameChange = (event) => {
@@ -29,18 +33,25 @@ const WelcomePage = () => {
 
     const db = getDatabase();
     const newRoomId = generateRoomId(); // สุ่มรหัสห้อง
-    const roomRef = ref(db, `rooms/${newRoomId}`);
-
-    await set(roomRef, {
-      host: userName, // สมมติว่าค่าตัวแปรนี้มาจากผู้ใช้จริง
-      // players: { ["userName"]: { username: "userName" } },
-      numbers: [],
-      revealNumbers: [],
-      heart: 3,
-      createdAt: serverTimestamp(),
-    });
-
-    navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
+    setIsCreating(true);
+    try {
+      // เขียนห้อง + roomIndex พร้อมกัน (roomIndex ใช้ลบห้องที่ร้างโดยไม่ต้องโหลดข้อมูลทุกห้อง)
+      await withTimeout(update(ref(db), {
+        [`rooms/${newRoomId}`]: {
+          host: userName,
+          hostId: getClientId(),
+          heart: 3,
+          settings: { numbersPerPlayer: 1 },
+          createdAt: serverTimestamp(),
+        },
+        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp() },
+      }), 'create room');
+      navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
+    } catch (error) {
+      reportDbError(error, 'create room');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleJoinRoom = () => {
@@ -49,64 +60,62 @@ const WelcomePage = () => {
     navigate(`/room/${roomId}`); // ไปยังห้องที่ป้อนรหัส
   };
 
-  const clearExpiredRoom = async () => {
-    const db = getDatabase();
-    const roomsRef = ref(db, 'rooms'); // จุดที่เก็บข้อมูลห้องทั้งหมด
-  
-    try {
-      const snapshot = await get(roomsRef); // ดึงข้อมูลห้องทั้งหมด
-      const rooms = snapshot.val();
-      if (rooms) {
-        const currentTimestamp = Date.now();
-  
-        // ใช้ for...of แทน forEach เพื่อให้ await ทำงานตามลำดับ
-        for (const roomId of Object.keys(rooms)) {
-          const roomData = rooms[roomId];
-          const createdAt = roomData.createdAt; // สมมติว่า field นี้เก็บเวลาเมื่อสร้าง room
-  
-          // ตรวจสอบว่า createdAt มีค่าเป็นตัวเลขและห้องนั้นหมดอายุแล้ว
-          if (createdAt && currentTimestamp - createdAt > 86400000) { // 86400000 มิลลิวินาที = 1 วัน
-            console.log(`Deleting room: ${roomId} because it is older than 1 day`);
-            await remove(ref(db, `rooms/${roomId}`)); // ลบห้องนั้นออกจากฐานข้อมูล
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up rooms: ', error);
-    }
-  };
-
   const initUsername = () => {
     const value = Cookies.get('userName')
     setUserName(value || '')
   }
 
   useEffect(() => {
-    // เรียกใช้ฟังก์ชัน clearExpiredRoom เมื่อโหลดหน้า
     initUsername()
-    clearExpiredRoom();
+    cleanupRooms(); // ลบห้องที่ร้างเกิน 10 นาที / อายุเกิน 1 วัน
   }, []);
 
   return (
-    <div style={{ width: "180px", padding: '3rem 1rem 0', display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: 'auto', gap: '8px' }}>
-      <p style={{fontWeight:600, fontSize: '24px'}}>Fake Ito Board Game</p>
-      <p style={{ margin: 0 }}>ชื่อผู่เล่น:</p>
-      <input
-        value={userName}
-        placeholder="ระบุชื่อผู้เล่น"
-        onChange={handleUserNameChange}
-      />
-      <p style={{fontWeight:500, fontSize: '24px' , margin: "16px 0 0"}}>เข้าร่วมห้อง</p>
-      
-      <p style={{ margin: 0 }}>เลขที่ห้อง:</p>
-      <input
-        value={roomId}
-        onChange={(e) => setRoomId(e.target.value)}
-        placeholder="รหัสห้อง"
-      />
-      <button className="button-common"  onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
-      <p style={{fontWeight:500, fontSize: '20px', margin: '2rem 0 0', textAlign:'center'}}>หรือ</p>
-      <button className="button-common"  onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+    <div className="wrapper">
+      <div className="stack welcome">
+        <header className="welcome-hero">
+          <div className="welcome-dice" aria-hidden="true">
+            <span style={{ color: 'hsl(200, 100%, 40%)' }}>1</span>
+            <span style={{ color: 'hsl(100, 100%, 40%)' }}>50</span>
+            <span style={{ color: 'hsl(2, 100%, 40%)' }}>100</span>
+          </div>
+          <h1 className="welcome-title">Fake Ito Board Game</h1>
+          <p className="hint">ใบ้คำตามเลขลับ แล้วเปิดไพ่เรียงจากน้อยไปมาก</p>
+        </header>
+
+        <section className="card">
+          <label className="field btn-block">
+            <span className="field-label">ชื่อผู้เล่น:</span>
+            <input
+              className="text-input"
+              value={userName}
+              placeholder="ระบุชื่อผู้เล่น"
+              onChange={handleUserNameChange}
+            />
+          </label>
+        </section>
+
+        <section className="card">
+          <h2 className="card-title">เข้าร่วมห้อง</h2>
+          <label className="field btn-block">
+            <span className="field-label">เลขที่ห้อง:</span>
+            <input
+              className="text-input"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value.trim())}
+              placeholder="รหัสห้อง"
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+          </label>
+          <button className="button-common btn-secondary btn-block btn-lg" onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
+        </section>
+
+        <p className="divider">หรือ</p>
+        <button className="button-common btn-primary btn-block btn-lg" onClick={handleCreateRoom} disabled={isCreating}>
+          {isCreating ? 'กำลังสร้างห้อง...' : 'สร้างห้องใหม่'}
+        </button>
+      </div>
     </div>
   );
 };

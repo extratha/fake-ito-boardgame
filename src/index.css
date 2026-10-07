@@ -1,32 +1,92 @@
-html{ 
-  font-family: "Noto Sans Thai", sans-serif;
-  background-color: rgb(26, 25, 24);
+/* ===== Design tokens: โต๊ะเกมโทนมืด (felt green + gold) ===== */
+:root {
+  --color-bg: #0f172a;
+  --color-bg-glow: #13233a;
+  --color-card: #192134;
+  --color-card-raised: #212b42;
+  --color-tile: #2c2c2c; /* พื้นหลังป้ายเลข: คงความมืดไว้ให้สีเลข (โซนต่ำ/สูง) อ่านง่ายเหมือนเดิม */
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-fg: #f8fafc;
+  --color-muted: #94a3b8;
+
+  --color-primary: #fbbf24; /* gold */
+  --color-primary-shade: #b45309;
+  --color-on-primary: #1c1203;
+  --color-secondary: #15803d; /* felt green */
+  --color-secondary-shade: #14532d;
+  --color-on-secondary: #ffffff;
+  --color-danger: #ef4444;
+  --color-danger-shade: #7f1d1d;
+  --color-neutral: #334155;
+  --color-neutral-shade: #0b1220;
+  --color-ring: #fde68a;
+
+  --font-display: "Mitr", "Noto Sans Thai", sans-serif;
+  --font-body: "Noto Sans Thai", sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --press-depth: 4px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-input {
-  font-family: "Noto Sans Thai", sans-serif;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
-button{ 
-  font-family: "Noto Sans Thai", sans-serif;
+
+html {
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
 }
 
 body {
   margin: 0;
-  font-family: "Noto Sans Thai", sans-serif;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--color-bg-glow), transparent 70%),
+    var(--color-bg);
+  color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: "Noto Sans Thai", sans-serif;
+input,
+button {
+  font: inherit;
 }
 
-.wrapper {
-  justify-items: center;
-  padding: 1.5rem 0 2rem 0 ;
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.25;
 }
 
-p,h1,h2,h3{
-  color: rgb(242, 243, 243)
+p,
+h1,
+h2,
+h3 {
+  color: var(--color-fg);
 }
 
+:focus-visible {
+  outline: 3px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
