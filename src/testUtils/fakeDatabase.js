@@ -4,6 +4,7 @@ let listeners = [];
 let clock = 1000;
 let pushCounter = 0;
 let hooks = {};
+let disconnectOps = new Map(); // path -> () => void
 
 const segments = (path) => path.split('/').filter(Boolean);
 const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
@@ -75,10 +76,17 @@ const related = (a, b) => {
   return sa.slice(0, n).join('/') === sb.slice(0, n).join('/');
 };
 
+// limitToLast: ตัดเหลือ n key ท้ายตามลำดับ RTDB
+const applyLimit = (value, limit) => {
+  if (!limit || !value || typeof value !== 'object') return value;
+  const keys = Object.keys(value).sort(compareKeys).slice(-limit);
+  return Object.fromEntries(keys.map((k) => [k, value[k]]));
+};
+
 const notify = (changedPath) => {
   listeners
     .filter((l) => related(l.path, changedPath))
-    .forEach((l) => l.cb(makeSnapshot(l.path, getAt(l.path))));
+    .forEach((l) => l.cb(makeSnapshot(l.path, applyLimit(getAt(l.path), l.limit))));
 };
 
 // ---- API เลียนแบบ firebase/database ----
@@ -110,10 +118,22 @@ export const update = async (r, updates) => {
 
 export const push = (r) => ({ path: `${r.path}/-k${String(++pushCounter).padStart(6, '0')}` });
 
+export const limitToLast = (limit) => ({ limit });
+export const query = (r, ...constraints) => ({ ...r, ...Object.assign({}, ...constraints) });
+
+export const onDisconnect = (r) => ({
+  set: async (value) => { disconnectOps.set(r.path, () => writeAt(r.path, value)); },
+  update: async (values) => {
+    disconnectOps.set(r.path, () => Object.entries(values).forEach(([k, v]) => writeAt(`${r.path}/${k}`, v)));
+  },
+  remove: async () => { disconnectOps.set(r.path, () => writeAt(r.path, null)); },
+  cancel: async () => { disconnectOps.delete(r.path); },
+});
+
 export const onValue = (r, cb) => {
-  const listener = { path: r.path, cb };
+  const listener = { path: r.path, cb, limit: r.limit };
   listeners.push(listener);
-  cb(makeSnapshot(r.path, getAt(r.path)));
+  cb(makeSnapshot(r.path, applyLimit(getAt(r.path), r.limit)));
   return () => { listeners = listeners.filter((l) => l !== listener); };
 };
 
@@ -137,7 +157,17 @@ export const __reset = (initial = {}) => {
   clock = 1000;
   pushCounter = 0;
   hooks = {};
+  disconnectOps = new Map();
 };
+// จำลอง socket หลุด: server รันคำสั่ง onDisconnect ที่ลงทะเบียนไว้
+export const __disconnect = () => {
+  const ops = [...disconnectOps.entries()];
+  disconnectOps = new Map();
+  ops.forEach(([, op]) => op());
+  ops.forEach(([path]) => notify(path));
+};
+export const __hasDisconnectOp = (path) => disconnectOps.has(path);
+export const __now = () => clock;
 export const __getData = (path = '') => clone(getAt(path)) ?? null;
 // เขียนข้อมูลแทน "ผู้เล่นคนอื่น" แล้วแจ้ง listener
 export const __write = (path, value) => { writeAt(path, value); notify(path); };

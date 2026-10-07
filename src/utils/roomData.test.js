@@ -30,3 +30,37 @@ test('pickRandomUnused ไม่คืนตัวที่ใช้แล้ว
     expect([3, 4]).toContain(pickRandomUnused(range(1, 4), [1, 2]));
   }
 });
+
+import { dealNumbers, getOnlinePlayers, pickHostCandidate } from './roomData';
+
+test('dealNumbers แจกครบทุกคน คนละ n เลข ไม่ซ้ำกัน และเรียงจากน้อยไปมาก', () => {
+  for (let round = 0; round < 50; round++) {
+    const dealt = dealNumbers(['a', 'b', 'c', 'd'], 3);
+    const all = Object.values(dealt).flat();
+    expect(Object.keys(dealt)).toEqual(['a', 'b', 'c', 'd']);
+    Object.values(dealt).forEach((nums) => {
+      expect(nums).toHaveLength(3);
+      expect(nums).toEqual([...nums].sort((x, y) => x - y));
+    });
+    expect(new Set(all).size).toBe(12);
+    all.forEach((n) => expect(n >= 1 && n <= 100).toBe(true));
+  }
+});
+
+test('dealNumbers แจกได้พอดี 100 เลข แต่เกินแล้ว throw', () => {
+  const ids = Array.from({ length: 50 }, (_, i) => `p${i}`);
+  expect(new Set(Object.values(dealNumbers(ids, 2)).flat()).size).toBe(100);
+  expect(() => dealNumbers([...ids, 'extra'], 2)).toThrow();
+});
+
+test('getOnlinePlayers / pickHostCandidate เลือกคนออนไลน์ที่เข้าห้องก่อนสุด', () => {
+  const players = [
+    { id: 'late', online: true, joinedAt: 30 },
+    { id: 'offline', online: false, joinedAt: 1 },
+    { id: 'early', online: true, joinedAt: 10 },
+    { id: 'noJoin', online: true },
+  ];
+  expect(getOnlinePlayers(players).map((p) => p.id)).toEqual(['early', 'late', 'noJoin']);
+  expect(pickHostCandidate(players).id).toBe('early');
+  expect(pickHostCandidate([{ id: 'x', online: false }])).toBeNull();
+});

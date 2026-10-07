@@ -1,44 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ref, set, get, onValue, push, remove, update, runTransaction, serverTimestamp } from "firebase/database";
 import { db } from '../firebase';
 import topic from '../constant/topic.json';
 import HeartDisplay from '../Heart';
 import RevealNumbers from '../RevealNumbers';
 import Cookies from 'js-cookie';
-import RuleDetail from '../RuleDetail';
 import { useNavigate, useParams } from 'react-router';
 import CopyIcon from "../icons/copy.svg";
 import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
-import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range } from '../utils/roomData';
+import { getClientId } from '../utils/clientId';
+import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers } from '../utils/roomData';
+import { useRoomPresence } from '../hooks/useRoomPresence';
+import { useHost } from '../hooks/useHost';
+import PlayerList, { CrownIcon } from '../PlayerList';
+import Chat from '../Chat';
 
 import '../App.css'
 import NameModal from '../NameModal';
 /* eslint-disable */
 
 const maxNumber = 100;
-const maxNumbersPerPlayer = 3;
-const allNumbers = range(1, maxNumber);
+const numbersPerPlayerOptions = [1, 2, 3];
 const topicMaxLength = topic.data.length
-
-// id ประจำเครื่อง ใช้ระบุว่าเลขไหนเป็นของเรา (refresh แล้วเลขไม่หาย)
-const getClientId = () => {
-  let clientId = Cookies.get('clientId');
-  if (!clientId) {
-    clientId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    Cookies.set('clientId', clientId, { expires: 365 });
-  }
-  return clientId;
-};
 
 function MainPage() {
   const [userName, setUserName] = useState('');
   const [clientId] = useState(getClientId);
-  const [myNumbers, setMyNumbers] = useState([]);
+  const [numberEntries, setNumberEntries] = useState([]);
+  const [numbersPerPlayer, setNumbersPerPlayer] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
   const [currentTopic, setCurrentTopic] = useState('');
-  const [isHost, setIsHost] = useState(false);
+  const [roomExists, setRoomExists] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
 
@@ -47,24 +41,12 @@ function MainPage() {
 
   const roomPath = `rooms/${roomId}`;
 
-  const checkIfUserIsHost = async () => {
-    setIsLoading(true);
-    const roomRef = ref(db, roomPath);
+  const players = useRoomPresence({ roomId, clientId, userName, enabled: roomExists });
+  const { hostId, hostName, isHost } = useHost({ roomPath, clientId, userName, players });
 
-    try {
-      const snapshot = await withTimeout(get(roomRef), 'check host');
-      if (snapshot.exists()) {
-        const roomData = snapshot.val();
-        setIsHost(roomData.host === userName);
-      } else {
-        console.log('Room not found');
-      }
-    } catch (error) {
-      reportDbError(error, 'check host');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const myNumbers = useMemo(() => getMyNumbers(numberEntries, clientId), [numberEntries, clientId]);
+  const dealtOwners = useMemo(() => new Set(numberEntries.map(item => item.owner).filter(Boolean)), [numberEntries]);
+  const onlinePlayers = getOnlinePlayers(players);
 
   const fetchUsedTopics = async () => {
     const snapshot = await withTimeout(get(ref(db, `${roomPath}/topic`)), 'fetch topics');
@@ -73,77 +55,36 @@ function MainPage() {
     return topicsArray.map(item => item.topic);
   };
 
-  const fetchNumberEntries = async () => {
-    const snapshot = await withTimeout(get(ref(db, `${roomPath}/numbers`)), 'fetch numbers');
-    return toNumberEntries(snapshotToList(snapshot));
+  const handleChangeNumbersPerPlayer = (value) => {
+    withTimeout(set(ref(db, `${roomPath}/settings/numbersPerPlayer`), value), 'set numbers per player')
+      .catch((error) => reportDbError(error, 'set numbers per player'));
   };
 
-  // จองเลขแบบ atomic: ถ้ามีคนจองเลขนี้ไปก่อน transaction จะไม่ commit
-  const claimNumber = async (number) => {
-    const numberRef = ref(db, `${roomPath}/numbers/${number}`);
-    const result = await withTimeout(runTransaction(numberRef, (current) => {
-      if (current !== null) return; // abort
-      return { owner: clientId, userName, createdAt: serverTimestamp() };
-    }), 'claim number');
-    return result.committed;
-  };
-
-  const drawNumber = async () => {
-    if (myNumbers.length >= maxNumbersPerPlayer) {
-      alert('คุณสุ่มเลขครบแล้ว');
+  // host แจกเลขให้ทุกคนที่ออนไลน์ในครั้งเดียว (เขียน multi-path update ครั้งเดียว เลขจึงไม่มีทางซ้ำ)
+  const handleDealNumbers = async () => {
+    if (onlinePlayers.length === 0) return;
+    if (onlinePlayers.length * numbersPerPlayer > maxNumber) {
+      alert(`ผู้เล่น ${onlinePlayers.length} คน คนละ ${numbersPerPlayer} เลข เกิน ${maxNumber} เลข ลดจำนวนเลขต่อคนก่อนนะ`);
+      return;
+    }
+    if (numberEntries.length > 0 && !confirm('แจกเลขใหม่ = เริ่มรอบใหม่ เลขเดิมและเลขที่เปิดแล้วจะหายไป ยืนยันหรือไม่')) {
       return;
     }
 
     setIsLoading(true);
     try {
-      let usedNumbers = (await fetchNumberEntries()).map(item => item.number);
-      while (true) {
-        const randomNumber = pickRandomUnused(allNumbers, usedNumbers);
-        if (randomNumber === null) {
-          alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
-          return;
-        }
-        if (await claimNumber(randomNumber)) return;
-        usedNumbers = [...usedNumbers, randomNumber]; // มีคนแย่งไปก่อน สุ่มใหม่
-      }
+      const dealt = dealNumbers(onlinePlayers.map(p => p.id), numbersPerPlayer, maxNumber);
+      const numbers = {};
+      onlinePlayers.forEach((player) => {
+        dealt[player.id].forEach((number) => {
+          numbers[number] = { owner: player.id, userName: player.name, createdAt: serverTimestamp() };
+        });
+      });
+      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null }), 'deal numbers');
     } catch (error) {
-      reportDbError(error, 'draw number');
+      reportDbError(error, 'deal numbers');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const clearUsedNumbers = async () => {
-    if (confirm('ยืนยันจะเคลียร์ที่ทุกคนสุ่มไปแล้วไหม')) {
-      setIsLoading(true);
-      try {
-        await withTimeout(remove(ref(db, `${roomPath}/numbers`)), 'clear all numbers');
-      } catch (error) {
-        reportDbError(error, 'clear all numbers');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  };
-
-  const clearMyNumbers = async () => {
-    if (confirm('คุณต้องการเคลียร์เลขที่เคยสุ่มไปแล้วใช่หรือไม่?')) {
-      setIsLoading(true);
-      try {
-        const entries = await fetchNumberEntries();
-        const updates = {};
-        entries
-          .filter(item => item.owner === clientId)
-          .forEach(item => { updates[`numbers/${item.id}`] = null; });
-        if (Object.keys(updates).length > 0) {
-          await withTimeout(update(ref(db, roomPath), updates), 'clear my numbers');
-        }
-        alert('เคลียร์เลขที่สุ่มไปแล้วเรียบร้อย!');
-      } catch (error) {
-        reportDbError(error, 'clear my numbers');
-      } finally {
-        setIsLoading(false);
-      }
     }
   };
 
@@ -269,20 +210,33 @@ function MainPage() {
     return () => unsubscribe();
   }, [roomPath]);
 
-  // sync เลขของตัวเองจาก DB: ถ้ามีคนเริ่มเกมใหม่/เคลียร์เลขทุกคน เลขในจอจะหายตาม
+  // เลขที่แจกแล้วทั้งห้อง: ใช้หาเลขของเรา และดูว่าใครยังไม่ได้เลข (เข้ามากลางรอบ)
   useEffect(() => {
     const numbersRef = ref(db, `${roomPath}/numbers`);
     const unsubscribe = onValue(numbersRef, (snapshot) => {
-      setMyNumbers(getMyNumbers(toNumberEntries(snapshotToList(snapshot)), clientId));
+      setNumberEntries(toNumberEntries(snapshotToList(snapshot)));
     });
 
     return () => unsubscribe();
-  }, [roomPath, clientId]);
+  }, [roomPath]);
 
   useEffect(() => {
+    const settingRef = ref(db, `${roomPath}/settings/numbersPerPlayer`);
+    const unsubscribe = onValue(settingRef, (snapshot) => {
+      const value = snapshot.val();
+      setNumbersPerPlayer(numbersPerPlayerOptions.includes(value) ? value : 1);
+    });
+
+    return () => unsubscribe();
+  }, [roomPath]);
+
+  useEffect(() => {
+    setRoomExists(false);
     withTimeout(get(ref(db, roomPath)), 'check room').then((snapshot) => {
       if (!snapshot.exists()) {
         navigate("/");
+      } else {
+        setRoomExists(true);
       }
     }).catch((error) => {
       reportDbError(error, 'check room');
@@ -290,11 +244,15 @@ function MainPage() {
     });
   }, [roomPath, navigate]);
 
-  useEffect(() => {
-    if (userName) {
-      checkIfUserIsHost();
+  const renderNumbersStatus = () => {
+    if (numberEntries.length === 0) {
+      return <p className="hint">{isHost ? 'เลือกจำนวนเลขต่อคน แล้วกดแจกเลขได้เลย' : `รอ ${hostName || 'host'} แจกเลข`}</p>;
     }
-  }, [userName, roomId]);
+    if (myNumbers.length === 0) {
+      return <p className="hint">รอบนี้เริ่มไปแล้ว รอรอบถัดไปนะ</p>;
+    }
+    return null;
+  };
 
   return (
     <div className="App">
@@ -305,15 +263,19 @@ function MainPage() {
           <div className="stack">
             <div className="room-header">
               <button className="button-common" onClick={() => handleClickBack()}>ย้อนกลับ</button>
-              <div className="room-id">
-                <h2>ห้อง: {roomId}</h2>
-                {roomId && (
-                  <button className="icon-button" onClick={copyToClipboard} aria-label={copied ? 'คัดลอกรหัสห้องแล้ว' : 'คัดลอกรหัสห้อง'}>
-                    {copied ? <img src={CopiedIcon} alt="" /> : <img src={CopyIcon} alt="" />}
-                  </button>
-                )}
+              <div className="room-meta">
+                <div className="room-id">
+                  <h2>ห้อง: {roomId}</h2>
+                  {roomId && (
+                    <button className="icon-button" onClick={copyToClipboard} aria-label={copied ? 'คัดลอกรหัสห้องแล้ว' : 'คัดลอกรหัสห้อง'}>
+                      {copied ? <img src={CopiedIcon} alt="" /> : <img src={CopyIcon} alt="" />}
+                    </button>
+                  )}
+                </div>
+                {isHost
+                  ? <span className="host-badge" role="status"><CrownIcon />คุณเป็น host</span>
+                  : hostName && <span className="host-badge is-other"><CrownIcon />host: {hostName}</span>}
               </div>
-              {/* <RuleDetail /> */}
             </div>
 
             <section className="card">
@@ -321,25 +283,46 @@ function MainPage() {
               <div className="topic-display">
                 {currentTopic
                   ? <h2>{currentTopic}</h2>
-                  : <p className="topic-empty">ยังไม่มีหัวข้อ กดสุ่มเพื่อเริ่มเกม</p>}
+                  : <p className="topic-empty">{isHost ? 'ยังไม่มีหัวข้อ กดสุ่มเพื่อเริ่มเกม' : 'รอ host สุ่มหัวข้อ'}</p>}
               </div>
-              <div className="button-row">
-                <button className="button-common btn-primary" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                {isHost && <button className="button-common" onClick={clearUsedTopics}>เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>}
-              </div>
+              {isHost && (
+                <div className="button-row">
+                  <button className="button-common btn-primary" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
+                  <button className="button-common" onClick={clearUsedTopics}>เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
+                </div>
+              )}
             </section>
 
             <section className="card">
-              <h2 className="card-title">สุ่มเลข 1-{maxNumber}</h2>
+              <h2 className="card-title">เลขของคุณ</h2>
 
-              <div className="button-row">
-                <button className="button-common btn-secondary btn-lg" disabled={myNumbers.length >= 1} onClick={drawNumber}>สุ่มเลข</button>
-                {myNumbers.length > 0 && myNumbers.length < maxNumbersPerPlayer && <button className="button-common btn-secondary btn-lg" onClick={drawNumber}>สุ่มอีกเลข</button>}
-              </div>
+              {isHost && (
+                <div className="deal-controls">
+                  <div className="segmented" role="group" aria-label="จำนวนเลขต่อคน">
+                    <span className="field-label">จำนวนเลขต่อคน</span>
+                    <div className="segmented-options">
+                      {numbersPerPlayerOptions.map((value) => (
+                        <button
+                          key={value}
+                          className={`segmented-option ${numbersPerPlayer === value ? 'is-active' : ''}`}
+                          aria-pressed={numbersPerPlayer === value}
+                          onClick={() => handleChangeNumbersPerPlayer(value)}
+                        >
+                          {value} เลข
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button className="button-common btn-secondary btn-lg" onClick={handleDealNumbers} disabled={onlinePlayers.length === 0}>
+                    {numberEntries.length > 0 ? 'แจกเลขใหม่' : 'แจกเลข'} ({onlinePlayers.length} คน)
+                  </button>
+                </div>
+              )}
+
+              {renderNumbersStatus()}
 
               {myNumbers.length > 0 &&
                 <>
-                  <p className="eyebrow">เลขที่ออก</p>
                   <div className="number-tiles">
                     {myNumbers.map((value) => (
                       <h1
@@ -359,14 +342,11 @@ function MainPage() {
                   <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>
                 </>
               }
-
-              <div className="button-row">
-                <button className="button-common" onClick={clearMyNumbers}>เคลียร์เลขของตัวเอง</button>
-                {isHost && <button className="button-common btn-danger" onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
-              </div>
             </section>
 
-            <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
+            <HeartDisplay roomId={roomId} heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
             <RevealNumbers roomId={roomId} />
           </div>
         }

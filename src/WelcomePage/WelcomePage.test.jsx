@@ -14,6 +14,7 @@ beforeEach(() => {
   fakeDb.__reset();
   mockNavigate.mockReset();
   Cookies.set('userName', 'Alice');
+  Cookies.set('clientId', 'client-alice');
   window.alert = jest.fn();
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -22,6 +23,7 @@ afterEach(() => {
   jest.useRealTimers();
   jest.restoreAllMocks();
   Cookies.remove('userName');
+  Cookies.remove('clientId');
 });
 
 test('สร้างห้องสำเร็จแล้วไปหน้าห้อง', async () => {
@@ -29,8 +31,9 @@ test('สร้างห้องสำเร็จแล้วไปหน้�
   userEvent.click(screen.getByText('สร้างห้องใหม่'));
   await screen.findByText('สร้างห้องใหม่');
   expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(/^\/room\/\w{8}$/));
-  const rooms = fakeDb.__getData('rooms');
-  expect(Object.values(rooms)[0]).toMatchObject({ host: 'Alice', heart: 3 });
+  const [roomId, room] = Object.entries(fakeDb.__getData('rooms'))[0];
+  expect(room).toMatchObject({ host: 'Alice', hostId: 'client-alice', heart: 3, settings: { numbersPerPlayer: 1 } });
+  expect(fakeDb.__getData(`roomIndex/${roomId}`)).toEqual({ createdAt: expect.any(Number), lastSeen: expect.any(Number) });
 });
 
 test('DB ต่อไม่ได้: ปุ่มขึ้นกำลังสร้างห้อง แล้วแจ้ง error เมื่อหมดเวลา แทนการเงียบ', async () => {

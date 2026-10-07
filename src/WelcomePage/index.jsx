@@ -1,8 +1,10 @@
-import { getDatabase, ref, set, serverTimestamp, get, remove } from "firebase/database";
+import { getDatabase, ref, update, serverTimestamp } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
 import { withTimeout, reportDbError } from "../utils/connection";
+import { getClientId } from "../utils/clientId";
+import { cleanupRooms } from "../utils/roomCleanup";
 
 const WelcomePage = () => {
   const [userName, setUserName] = useState('');
@@ -31,17 +33,18 @@ const WelcomePage = () => {
 
     const db = getDatabase();
     const newRoomId = generateRoomId(); // สุ่มรหัสห้อง
-    const roomRef = ref(db, `rooms/${newRoomId}`);
-
     setIsCreating(true);
     try {
-      await withTimeout(set(roomRef, {
-        host: userName, // สมมติว่าค่าตัวแปรนี้มาจากผู้ใช้จริง
-        // players: { ["userName"]: { username: "userName" } },
-        numbers: [],
-        revealNumbers: [],
-        heart: 3,
-        createdAt: serverTimestamp(),
+      // เขียนห้อง + roomIndex พร้อมกัน (roomIndex ใช้ลบห้องที่ร้างโดยไม่ต้องโหลดข้อมูลทุกห้อง)
+      await withTimeout(update(ref(db), {
+        [`rooms/${newRoomId}`]: {
+          host: userName,
+          hostId: getClientId(),
+          heart: 3,
+          settings: { numbersPerPlayer: 1 },
+          createdAt: serverTimestamp(),
+        },
+        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp() },
       }), 'create room');
       navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
     } catch (error) {
@@ -57,42 +60,14 @@ const WelcomePage = () => {
     navigate(`/room/${roomId}`); // ไปยังห้องที่ป้อนรหัส
   };
 
-  const clearExpiredRoom = async () => {
-    const db = getDatabase();
-    const roomsRef = ref(db, 'rooms'); // จุดที่เก็บข้อมูลห้องทั้งหมด
-  
-    try {
-      const snapshot = await withTimeout(get(roomsRef), 'clean up rooms'); // ดึงข้อมูลห้องทั้งหมด
-      const rooms = snapshot.val();
-      if (rooms) {
-        const currentTimestamp = Date.now();
-  
-        // ใช้ for...of แทน forEach เพื่อให้ await ทำงานตามลำดับ
-        for (const roomId of Object.keys(rooms)) {
-          const roomData = rooms[roomId];
-          const createdAt = roomData.createdAt; // สมมติว่า field นี้เก็บเวลาเมื่อสร้าง room
-  
-          // ตรวจสอบว่า createdAt มีค่าเป็นตัวเลขและห้องนั้นหมดอายุแล้ว
-          if (createdAt && currentTimestamp - createdAt > 86400000) { // 86400000 มิลลิวินาที = 1 วัน
-            console.log(`Deleting room: ${roomId} because it is older than 1 day`);
-            await remove(ref(db, `rooms/${roomId}`)); // ลบห้องนั้นออกจากฐานข้อมูล
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up rooms: ', error);
-    }
-  };
-
   const initUsername = () => {
     const value = Cookies.get('userName')
     setUserName(value || '')
   }
 
   useEffect(() => {
-    // เรียกใช้ฟังก์ชัน clearExpiredRoom เมื่อโหลดหน้า
     initUsername()
-    clearExpiredRoom();
+    cleanupRooms(); // ลบห้องที่ร้างเกิน 10 นาที / อายุเกิน 1 วัน
   }, []);
 
   return (

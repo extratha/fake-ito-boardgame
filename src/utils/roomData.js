@@ -38,3 +38,27 @@ export const pickRandomUnused = (pool, used, random = Math.random) => {
 };
 
 export const range = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+// ผู้เล่นที่ออนไลน์ เรียงตามเวลาที่เข้าห้อง (คนเข้าก่อนอยู่หน้า)
+export const getOnlinePlayers = (players) =>
+  players
+    .filter((p) => p.online === true)
+    .sort((a, b) => (a.joinedAt ?? Infinity) - (b.joinedAt ?? Infinity) || (a.id < b.id ? -1 : 1));
+
+// host หลุด: ให้คนที่ออนไลน์และเข้าห้องก่อนสุดรับ host ต่อ
+export const pickHostCandidate = (players) => getOnlinePlayers(players)[0] ?? null;
+
+// host แจกเลขทีเดียวให้ทุกคน (สุ่มจากสำรับ 1..maxNumber ไม่มีซ้ำ)
+export const dealNumbers = (playerIds, perPlayer, maxNumber = 100, random = Math.random) => {
+  const total = playerIds.length * perPlayer;
+  if (total > maxNumber) throw new Error(`need ${total} numbers but only ${maxNumber} available`);
+  const deck = range(1, maxNumber);
+  for (let i = 0; i < total; i++) {
+    const j = i + Math.floor(random() * (deck.length - i));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return Object.fromEntries(playerIds.map((id, index) => [
+    id,
+    deck.slice(index * perPlayer, (index + 1) * perPlayer).sort((a, b) => a - b),
+  ]));
+};
