@@ -304,84 +304,78 @@ function MainPage() {
     <div className="App">
       <div className='wrapper'>
         {isLoading ?
-          <h3> ...LOADING...</h3>
+          <h3 className="loading">กำลังโหลด...</h3>
           :
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '0 12px' }} >
+          <div className="stack">
+            <div className="room-header">
               <button className="button-common" onClick={() => handleClickBack()}>ย้อนกลับ</button>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', }}>
-                <h2 style={{ margin: '0' }}> ห้อง: </h2>
-                <h2 style={{ margin: '0' }}>{roomId}</h2>
+              <div className="room-id">
+                <h2>ห้อง: {roomId}</h2>
                 {roomId && (
-                  <button onClick={copyToClipboard} style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center"
-                  }}>
-                    {copied ? <img src={CopiedIcon} alt="copy" /> : <img src={CopyIcon} alt="copy" />}
+                  <button className="icon-button" onClick={copyToClipboard} aria-label={copied ? 'คัดลอกรหัสห้องแล้ว' : 'คัดลอกรหัสห้อง'}>
+                    {copied ? <img src={CopiedIcon} alt="" /> : <img src={CopyIcon} alt="" />}
                   </button>
                 )}
               </div>
               {/* <RuleDetail /> */}
             </div>
 
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: "8px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <button className="button-common" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                  {isHost &&<button className="button-common" onClick={clearUsedTopics} >เคลียร์หัวข้อที่เคยสุ่มแล้ว</button> }
-                </div>
+            <section className="card">
+              <p className="eyebrow">หัวข้อ:</p>
+              <div className="topic-display">
+                {currentTopic
+                  ? <h2>{currentTopic}</h2>
+                  : <p className="topic-empty">ยังไม่มีหัวข้อ กดสุ่มเพื่อเริ่มเกม</p>}
+              </div>
+              <div className="button-row">
+                <button className="button-common btn-primary" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
+                {isHost && <button className="button-common" onClick={clearUsedTopics}>เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>}
+              </div>
+            </section>
 
-                <div style={{ display: "flex", flexDirection: "row", gap: '8px', alignItems: 'center' }}>
-                  <p style={{ margin: "0", fontSize: '22px', fontWeight: '500' }}> หัวข้อ: </p>
-                  <h2 style={{ margin: "0" }}> {currentTopic}</h2>
-                </div>
+            <section className="card">
+              <h2 className="card-title">สุ่มเลข 1-{maxNumber}</h2>
+
+              <div className="button-row">
+                <button className="button-common btn-secondary btn-lg" disabled={myNumbers.length >= 1} onClick={drawNumber}>สุ่มเลข</button>
+                {myNumbers.length > 0 && myNumbers.length < maxNumbersPerPlayer && <button className="button-common btn-secondary btn-lg" onClick={drawNumber}>สุ่มอีกเลข</button>}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: "16px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
-                <h2 style={{ margin: "8px" }}>สุ่มเลข 1-{maxNumber}</h2>
-
-                <button className="button-common" style={{ width: "120px" }} disabled={myNumbers.length >= 1} onClick={drawNumber}>สุ่มเลข</button>
-                {myNumbers.length > 0 && myNumbers.length < maxNumbersPerPlayer && <button className="button-common" onClick={drawNumber}>สุ่มอีกเลข</button>}
-
-                {myNumbers &&
-                  <div style={{ display: 'flex', flexDirection: "column", gap: "16px", alignItems: 'center' }}>
-                    <h2 style={{ margin: "16px 0 0", color: myNumbers.length > 0 ? 'default' : 'transparent' }}>เลขที่ออก</h2>
-                    <div style={{ display: 'flex', gap: '14px' }}>
-                      {myNumbers.map((value) => (
-                        <h1 key={value}
-                          onClick={() => handleClickNumber(value)}
-                          style={{
-                            width: '79px',
-                            margin: '0 0 16px', cursor: 'pointer', color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)`,
-                            borderRadius: "8px",
-                            boxShadow: "2px 2px 5px rgb(0, 0, 0)",
-                            padding: "8px 12px",
-                            display: "inline-block",
-                            background: "rgb(44, 44, 44)",
-                          }}
-                        >
-                          {value}
-                        </h1>
-                      ))}
-                    </div>
+              {myNumbers.length > 0 &&
+                <>
+                  <p className="eyebrow">เลขที่ออก</p>
+                  <div className="number-tiles">
+                    {myNumbers.map((value) => (
+                      <h1
+                        key={value}
+                        className="number-tile"
+                        role="heading"
+                        aria-level={1}
+                        tabIndex={0}
+                        onClick={() => handleClickNumber(value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickNumber(value); } }}
+                        style={{ color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)` }}
+                      >
+                        {value}
+                      </h1>
+                    ))}
                   </div>
-                }
+                  <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>
+                </>
+              }
 
+              <div className="button-row">
                 <button className="button-common" onClick={clearMyNumbers}>เคลียร์เลขของตัวเอง</button>
-                {isHost && <button className="button-common" onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
+                {isHost && <button className="button-common btn-danger" onClick={clearUsedNumbers}>เคลียร์เลขทุกคน</button>}
               </div>
+            </section>
 
-              <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
-              <RevealNumbers roomId={roomId} />
-            </div>
-
-            {
-              showNameModal && <NameModal userName={userName} setUserName={setUserName} setShowNameModal={setShowNameModal} />
-            }
+            <HeartDisplay roomId={roomId} heart={heart} setHeart={setHeart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <RevealNumbers roomId={roomId} />
           </div>
+        }
+        {
+          showNameModal && <NameModal userName={userName} setUserName={setUserName} setShowNameModal={setShowNameModal} />
         }
       </div>
     </div>

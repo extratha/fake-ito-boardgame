@@ -1,4 +1,4 @@
-import { getDatabase, push, ref, set, serverTimestamp, get, remove } from "firebase/database";
+import { getDatabase, ref, set, serverTimestamp, get, remove } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
@@ -88,25 +88,49 @@ const WelcomePage = () => {
   }, []);
 
   return (
-    <div style={{ width: "180px", padding: '3rem 1rem 0', display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: 'auto', gap: '8px' }}>
-      <p style={{fontWeight:600, fontSize: '24px'}}>Fake Ito Board Game</p>
-      <p style={{ margin: 0 }}>ชื่อผู่เล่น:</p>
-      <input
-        value={userName}
-        placeholder="ระบุชื่อผู้เล่น"
-        onChange={handleUserNameChange}
-      />
-      <p style={{fontWeight:500, fontSize: '24px' , margin: "16px 0 0"}}>เข้าร่วมห้อง</p>
-      
-      <p style={{ margin: 0 }}>เลขที่ห้อง:</p>
-      <input
-        value={roomId}
-        onChange={(e) => setRoomId(e.target.value)}
-        placeholder="รหัสห้อง"
-      />
-      <button className="button-common"  onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
-      <p style={{fontWeight:500, fontSize: '20px', margin: '2rem 0 0', textAlign:'center'}}>หรือ</p>
-      <button className="button-common"  onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+    <div className="wrapper">
+      <div className="stack welcome">
+        <header className="welcome-hero">
+          <div className="welcome-dice" aria-hidden="true">
+            <span style={{ color: 'hsl(200, 100%, 40%)' }}>1</span>
+            <span style={{ color: 'hsl(100, 100%, 40%)' }}>50</span>
+            <span style={{ color: 'hsl(2, 100%, 40%)' }}>100</span>
+          </div>
+          <h1 className="welcome-title">Fake Ito Board Game</h1>
+          <p className="hint">ใบ้คำตามเลขลับ แล้วเปิดไพ่เรียงจากน้อยไปมาก</p>
+        </header>
+
+        <section className="card">
+          <label className="field btn-block">
+            <span className="field-label">ชื่อผู้เล่น:</span>
+            <input
+              className="text-input"
+              value={userName}
+              placeholder="ระบุชื่อผู้เล่น"
+              onChange={handleUserNameChange}
+            />
+          </label>
+        </section>
+
+        <section className="card">
+          <h2 className="card-title">เข้าร่วมห้อง</h2>
+          <label className="field btn-block">
+            <span className="field-label">เลขที่ห้อง:</span>
+            <input
+              className="text-input"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value.trim())}
+              placeholder="รหัสห้อง"
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+          </label>
+          <button className="button-common btn-secondary btn-block btn-lg" onClick={handleJoinRoom}>เข้าร่วมห้อง</button>
+        </section>
+
+        <p className="divider">หรือ</p>
+        <button className="button-common btn-primary btn-block btn-lg" onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+      </div>
     </div>
   );
 };

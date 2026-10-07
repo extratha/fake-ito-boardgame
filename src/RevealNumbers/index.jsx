@@ -3,9 +3,17 @@ import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
 import { snapshotToList } from "../utils/roomData";
 
+const ChevronLeft = () => (
+  <svg className="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+);
+
 const RevealNumbers = ({ roomId }) => {
 
   const [revealNumbers, setRevealNumbers] = useState([]);
+  // ซ่อน panel ได้ เพื่อไม่ให้บังปุ่ม/เลขที่อยู่ด้านหลัง
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
@@ -18,42 +26,33 @@ const RevealNumbers = ({ roomId }) => {
     return () => unsubscribe();
   }, [roomId]);
 
-  const RevealedNumber = ({ data, styles }) => <p style={{ margin: '0', fontSize: '16px', fontWeight: 500, ...styles }}>{data}</p>;
-
   return (
-    <div style={{
-      minWidth: "100px",
-      height: '82vh',
-      padding: "6px",
-      overflow: 'auto',
-      position: 'fixed',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: "8px",
-      left: '8px',
-      top: '3rem',
-    }}>
-      {revealNumbers
-        .map((revealedData) => (
-          <div key={revealedData.id} style={{
-            width: "80px",
-            padding: "8px",
-            borderRadius: "8px",
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            background: "rgb(44, 44, 44)",
-            boxShadow: "2px 2px 5px rgb(0, 0, 0)",
-            padding: "8px 12px",
-            display: "inline-block",
-          }}>
-            <RevealedNumber data={revealedData.userName} />
-            <RevealedNumber data={revealedData.number} styles={{ color: `hsl(${200 - ((revealedData.number - 1) * 2)}, 100%, 40%)` }} />
-          </div>
-        ))}
-    </div>
+    <aside className={`reveal-panel ${isExpanded ? '' : 'is-collapsed'}`} aria-label="เลขที่เปิดแล้ว">
+      <div className="reveal-panel-header">
+        <p className="reveal-panel-title">เปิดแล้ว {revealNumbers.length}</p>
+        <button
+          className="icon-button reveal-toggle"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          aria-expanded={isExpanded}
+          aria-controls="reveal-list"
+          aria-label={isExpanded ? 'ซ่อนเลขที่เปิดแล้ว' : 'แสดงเลขที่เปิดแล้ว'}
+        >
+          <ChevronLeft />
+        </button>
+      </div>
+      {isExpanded && (
+        <div id="reveal-list" className="reveal-list">
+          {revealNumbers.map((revealedData) => (
+            <div key={revealedData.id} className="reveal-item">
+              <p>{revealedData.userName}</p>
+              <p className="reveal-number" style={{ color: `hsl(${200 - ((revealedData.number - 1) * 2)}, 100%, 40%)` }}>
+                {revealedData.number}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </aside>
   );
 };
 

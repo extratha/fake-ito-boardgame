@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 
 const NameModal = ({ userName, setUserName, setShowNameModal}) => {
-  const [tmpUserName, setTmpUserName] = useState()
+  const [tmpUserName, setTmpUserName] = useState('')
 
   const handleSaveName = () => {
     setUserName(tmpUserName)
@@ -19,15 +19,17 @@ const NameModal = ({ userName, setUserName, setShowNameModal}) => {
   }
 
   return (<div className="modal-overlay">
-    <div className="modal-content">
-      <h3 style={{color:"rgba(0, 0, 0, 0.68)"}}>กรุณากรอกชื่อของคุณ</h3>
+    <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="name-modal-title">
+      <h3 id="name-modal-title">กรุณากรอกชื่อของคุณ</h3>
       <input
+        className="text-input"
+        autoFocus
         type="text"
         onChange={(e)=>setTmpUserName(e?.target?.value)}
         value={tmpUserName}
         placeholder="พิมพ์ชื่อที่นี่"
       />
-      <button className='button-common' onClick={() => handleSaveName()}>ยืนยัน</button>
+      <button className='button-common btn-primary btn-lg' onClick={() => handleSaveName()}>ยืนยัน</button>
     </div>
   </div>)
 }
