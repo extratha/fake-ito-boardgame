@@ -9,6 +9,7 @@ import RuleDetail from '../RuleDetail';
 import { useNavigate, useParams } from 'react-router';
 import CopyIcon from "../icons/copy.svg";
 import CopiedIcon from "../icons/copied.svg";
+import { withTimeout, reportDbError } from '../utils/connection';
 import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range } from '../utils/roomData';
 
 import '../App.css'
@@ -51,7 +52,7 @@ function MainPage() {
     const roomRef = ref(db, roomPath);
 
     try {
-      const snapshot = await get(roomRef);
+      const snapshot = await withTimeout(get(roomRef), 'check host');
       if (snapshot.exists()) {
         const roomData = snapshot.val();
         setIsHost(roomData.host === userName);
@@ -59,31 +60,31 @@ function MainPage() {
         console.log('Room not found');
       }
     } catch (error) {
-      console.error('Error fetching room data:', error);
+      reportDbError(error, 'check host');
     } finally {
       setIsLoading(false);
     }
   };
 
   const fetchUsedTopics = async () => {
-    const snapshot = await get(ref(db, `${roomPath}/topic`));
+    const snapshot = await withTimeout(get(ref(db, `${roomPath}/topic`)), 'fetch topics');
     const topicsArray = snapshotToList(snapshot);
     console.log("จำนวนหัวข้อทั้งหมด", topicMaxLength, "สุ่มไปแล้ว", topicsArray.length)
     return topicsArray.map(item => item.topic);
   };
 
   const fetchNumberEntries = async () => {
-    const snapshot = await get(ref(db, `${roomPath}/numbers`));
+    const snapshot = await withTimeout(get(ref(db, `${roomPath}/numbers`)), 'fetch numbers');
     return toNumberEntries(snapshotToList(snapshot));
   };
 
   // จองเลขแบบ atomic: ถ้ามีคนจองเลขนี้ไปก่อน transaction จะไม่ commit
   const claimNumber = async (number) => {
     const numberRef = ref(db, `${roomPath}/numbers/${number}`);
-    const result = await runTransaction(numberRef, (current) => {
+    const result = await withTimeout(runTransaction(numberRef, (current) => {
       if (current !== null) return; // abort
       return { owner: clientId, userName, createdAt: serverTimestamp() };
-    });
+    }), 'claim number');
     return result.committed;
   };
 
@@ -106,7 +107,7 @@ function MainPage() {
         usedNumbers = [...usedNumbers, randomNumber]; // มีคนแย่งไปก่อน สุ่มใหม่
       }
     } catch (error) {
-      console.error(error);
+      reportDbError(error, 'draw number');
     } finally {
       setIsLoading(false);
     }
@@ -116,9 +117,9 @@ function MainPage() {
     if (confirm('ยืนยันจะเคลียร์ที่ทุกคนสุ่มไปแล้วไหม')) {
       setIsLoading(true);
       try {
-        await remove(ref(db, `${roomPath}/numbers`));
+        await withTimeout(remove(ref(db, `${roomPath}/numbers`)), 'clear all numbers');
       } catch (error) {
-        console.error(error);
+        reportDbError(error, 'clear all numbers');
       } finally {
         setIsLoading(false);
       }
@@ -135,11 +136,11 @@ function MainPage() {
           .filter(item => item.owner === clientId)
           .forEach(item => { updates[`numbers/${item.id}`] = null; });
         if (Object.keys(updates).length > 0) {
-          await update(ref(db, roomPath), updates);
+          await withTimeout(update(ref(db, roomPath), updates), 'clear my numbers');
         }
         alert('เคลียร์เลขที่สุ่มไปแล้วเรียบร้อย!');
       } catch (error) {
-        console.error(error);
+        reportDbError(error, 'clear my numbers');
       } finally {
         setIsLoading(false);
       }
@@ -160,13 +161,13 @@ function MainPage() {
           return;
         }
 
-        await set(push(ref(db, `${roomPath}/topic`)), {
+        await withTimeout(set(push(ref(db, `${roomPath}/topic`)), {
           topic: randomTopic,
           createdAt: serverTimestamp(),
-        });
+        }), 'random topic');
         setCurrentTopic(randomTopic);
       } catch (error) {
-        console.error("Error fetching topics:", error);
+        reportDbError(error, 'random topic');
       } finally {
         setIsLoading(false);
       }
@@ -177,29 +178,24 @@ function MainPage() {
     if (confirm('ยืนยันจะเคลียร์หัวข้อที่เคยสุ่มแล้วหรือไม่?')) {
       setIsLoading(true);
       try {
-        await remove(ref(db, `${roomPath}/topic`));
+        await withTimeout(remove(ref(db, `${roomPath}/topic`)), 'clear topics');
         setCurrentTopic('');
       } catch (error) {
-        console.error(error);
+        reportDbError(error, 'clear topics');
       } finally {
         setIsLoading(false);
       }
     }
   };
 
-  const resetGameData = async () => {
-    try {
-      await update(ref(db, roomPath), { numbers: null, revealNumbers: null });
-    } catch (e) {
-      console.error('Error resetting game data: ', e);
-    }
-  };
+  const resetGameData = () =>
+    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null }), 'reset game');
 
   const handleClickNumber = async (number) => {
     const revealNumbersRef = ref(db, `${roomPath}/revealNumbers`);
 
     try {
-      const snapshot = await get(revealNumbersRef);
+      const snapshot = await withTimeout(get(revealNumbersRef), 'fetch revealed numbers');
       const isNumberRevealed = snapshotToList(snapshot).some((item) => item.number === number);
       if (isNumberRevealed) {
         alert('เลขนี้เคยถูกเปิดเผยแล้ว');
@@ -207,28 +203,29 @@ function MainPage() {
       }
 
       if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
-        await set(push(revealNumbersRef), {
+        await withTimeout(set(push(revealNumbersRef), {
           number,
           userName,
           createdAt: serverTimestamp(),
-        });
+        }), 'reveal number');
       }
     } catch (error) {
-      console.error(error);
+      reportDbError(error, 'reveal number');
     }
   };
 
   const handleResetHeart = () => {
-    set(ref(db, `${roomPath}/heart`), 3);
+    withTimeout(set(ref(db, `${roomPath}/heart`), 3), 'reset heart')
+      .catch((error) => reportDbError(error, 'reset heart'));
   };
 
   // ใช้ transaction กันกดพร้อมกันแล้วหัวใจลดไม่ครบ
   const handleReduceHeart = () => {
-    runTransaction(ref(db, `${roomPath}/heart`), (current) => {
+    withTimeout(runTransaction(ref(db, `${roomPath}/heart`), (current) => {
       const value = current ?? 3;
       if (value <= 0) return; // abort
       return value - 1;
-    }).catch(console.error);
+    }), 'reduce heart').catch((error) => reportDbError(error, 'reduce heart'));
   };
 
   const copyToClipboard = () => {
@@ -283,13 +280,12 @@ function MainPage() {
   }, [roomPath, clientId]);
 
   useEffect(() => {
-    get(ref(db, roomPath)).then((snapshot) => {
+    withTimeout(get(ref(db, roomPath)), 'check room').then((snapshot) => {
       if (!snapshot.exists()) {
         navigate("/");
       }
     }).catch((error) => {
-      console.error("Error fetching room data:", error);
-      alert('somethings wrong ')
+      reportDbError(error, 'check room');
       navigate("/");
     });
   }, [roomPath, navigate]);

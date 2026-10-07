@@ -250,3 +250,20 @@ describe('heart', () => {
     expect(fakeDb.__getData(`${ROOM}/heart`)).toBe(0);
   });
 });
+
+describe('connection', () => {
+  test('DB ค้างระหว่างสุ่มเลข: แจ้ง error เมื่อหมดเวลาและหน้าไม่ค้าง LOADING', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await renderPage();
+    jest.useFakeTimers();
+    fakeDb.__setHooks({ offline: true });
+
+    userEvent.click(screen.getByText('สุ่มเลข'));
+    expect(screen.getByText('กำลังโหลด...')).toBeInTheDocument();
+
+    await act(async () => { jest.advanceTimersByTime(8000); });
+    expect(window.alert).toHaveBeenCalledWith('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง');
+    expect(screen.getByText('สุ่มเลข')).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+});

@@ -2,10 +2,12 @@ import { getDatabase, ref, set, serverTimestamp, get, remove } from "firebase/da
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
+import { withTimeout, reportDbError } from "../utils/connection";
 
 const WelcomePage = () => {
   const [userName, setUserName] = useState('');
   const [roomId, setRoomId] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
 
   const handleUserNameChange = (event) => {
@@ -31,16 +33,22 @@ const WelcomePage = () => {
     const newRoomId = generateRoomId(); // สุ่มรหัสห้อง
     const roomRef = ref(db, `rooms/${newRoomId}`);
 
-    await set(roomRef, {
-      host: userName, // สมมติว่าค่าตัวแปรนี้มาจากผู้ใช้จริง
-      // players: { ["userName"]: { username: "userName" } },
-      numbers: [],
-      revealNumbers: [],
-      heart: 3,
-      createdAt: serverTimestamp(),
-    });
-
-    navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
+    setIsCreating(true);
+    try {
+      await withTimeout(set(roomRef, {
+        host: userName, // สมมติว่าค่าตัวแปรนี้มาจากผู้ใช้จริง
+        // players: { ["userName"]: { username: "userName" } },
+        numbers: [],
+        revealNumbers: [],
+        heart: 3,
+        createdAt: serverTimestamp(),
+      }), 'create room');
+      navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
+    } catch (error) {
+      reportDbError(error, 'create room');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleJoinRoom = () => {
@@ -54,7 +62,7 @@ const WelcomePage = () => {
     const roomsRef = ref(db, 'rooms'); // จุดที่เก็บข้อมูลห้องทั้งหมด
   
     try {
-      const snapshot = await get(roomsRef); // ดึงข้อมูลห้องทั้งหมด
+      const snapshot = await withTimeout(get(roomsRef), 'clean up rooms'); // ดึงข้อมูลห้องทั้งหมด
       const rooms = snapshot.val();
       if (rooms) {
         const currentTimestamp = Date.now();
@@ -129,7 +137,9 @@ const WelcomePage = () => {
         </section>
 
         <p className="divider">หรือ</p>
-        <button className="button-common btn-primary btn-block btn-lg" onClick={handleCreateRoom}>สร้างห้องใหม่</button>
+        <button className="button-common btn-primary btn-block btn-lg" onClick={handleCreateRoom} disabled={isCreating}>
+          {isCreating ? 'กำลังสร้างห้อง...' : 'สร้างห้องใหม่'}
+        </button>
       </div>
     </div>
   );

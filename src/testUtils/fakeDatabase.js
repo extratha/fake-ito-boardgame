@@ -86,9 +86,16 @@ export const getDatabase = () => ({});
 export const ref = (_db, path = '') => ({ path });
 export const serverTimestamp = () => ({ '.sv': 'timestamp' });
 
-export const get = async (r) => makeSnapshot(r.path, getAt(r.path));
+// จำลองต่อ server ไม่ได้: SDK จริงจะรอไปเรื่อย ๆ ไม่ resolve/reject
+const hang = () => new Promise(() => {});
+
+export const get = async (r) => {
+  if (hooks.offline) return hang();
+  return makeSnapshot(r.path, getAt(r.path));
+};
 
 export const set = async (r, value) => {
+  if (hooks.offline) return hang();
   writeAt(r.path, value);
   notify(r.path);
 };
@@ -96,6 +103,7 @@ export const set = async (r, value) => {
 export const remove = (r) => set(r, null);
 
 export const update = async (r, updates) => {
+  if (hooks.offline) return hang();
   Object.entries(updates).forEach(([key, value]) => writeAt(`${r.path}/${key}`, value));
   notify(r.path);
 };
@@ -110,6 +118,7 @@ export const onValue = (r, cb) => {
 };
 
 export const runTransaction = async (r, updateFn) => {
+  if (hooks.offline) return hang();
   await hooks.beforeTransaction?.(r.path);
   const current = getAt(r.path);
   const next = updateFn(current === undefined ? null : clone(current));
