@@ -336,18 +336,14 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  width: 112px;
+  width: 144px; /* พอดี header (ไอคอนจับ + "เปิดแล้ว N" + ปุ่ม 44px) ทั้งตอนกางและพับ */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  transition: width 200ms var(--ease-out), top 200ms var(--ease-out);
-}
-
-.reveal-panel.is-collapsed {
-  width: auto;
+  transition: top 200ms var(--ease-out);
 }
 
 .reveal-panel.is-dragging {
@@ -379,11 +375,19 @@
 }
 
 .reveal-panel-title {
+  flex: 1;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-display);
   font-size: 14px;
   white-space: nowrap;
   color: var(--color-muted);
+}
+
+.reveal-toggle {
+  flex: none; /* ไม่ให้ปุ่มถูกบีบ ขนาด 44x44 เท่ากันทุกสถานะ */
 }
 
 .reveal-toggle .chevron {
