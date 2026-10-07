@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, set, get, onValue, push, remove, runTransaction } from "firebase/database";
+import { ref, set, get, onValue, push, remove, update, runTransaction, serverTimestamp } from "firebase/database";
+import { db } from '../firebase';
 import topic from '../constant/topic.json';
 import HeartDisplay from '../Heart';
 import RevealNumbers from '../RevealNumbers';
@@ -8,16 +9,30 @@ import RuleDetail from '../RuleDetail';
 import { useNavigate, useParams } from 'react-router';
 import CopyIcon from "../icons/copy.svg";
 import CopiedIcon from "../icons/copied.svg";
+import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range } from '../utils/roomData';
 
 import '../App.css'
 import NameModal from '../NameModal';
 /* eslint-disable */
 
 const maxNumber = 100;
+const maxNumbersPerPlayer = 3;
+const allNumbers = range(1, maxNumber);
 const topicMaxLength = topic.data.length
+
+// id ประจำเครื่อง ใช้ระบุว่าเลขไหนเป็นของเรา (refresh แล้วเลขไม่หาย)
+const getClientId = () => {
+  let clientId = Cookies.get('clientId');
+  if (!clientId) {
+    clientId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    Cookies.set('clientId', clientId, { expires: 365 });
+  }
+  return clientId;
+};
 
 function MainPage() {
   const [userName, setUserName] = useState('');
+  const [clientId] = useState(getClientId);
   const [myNumbers, setMyNumbers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
@@ -29,20 +44,17 @@ function MainPage() {
   const navigate = useNavigate();
   const { roomId } = useParams();
 
+  const roomPath = `rooms/${roomId}`;
+
   const checkIfUserIsHost = async () => {
     setIsLoading(true);
-    const db = getDatabase();
-    const roomRef = ref(db, `rooms/${roomId}`);
+    const roomRef = ref(db, roomPath);
 
     try {
       const snapshot = await get(roomRef);
       if (snapshot.exists()) {
         const roomData = snapshot.val();
-        if (roomData.host === userName) {
-          setIsHost(true);  // Set isHost to true if the user is the host
-        } else {
-          setIsHost(false);
-        }
+        setIsHost(roomData.host === userName);
       } else {
         console.log('Room not found');
       }
@@ -54,275 +66,169 @@ function MainPage() {
   };
 
   const fetchUsedTopics = async () => {
-    setIsLoading(true);
-    const db = getDatabase();
-    const topicRef = ref(db, `rooms/${roomId}/topic`);
-
-    try {
-      const snapshot = await get(topicRef);
-      if (snapshot.exists()) {
-        const topicsArray = Object.values(snapshot.val()); // ได้เป็น array ของหัวข้อทั้งหมด
-        const latestTopic = topicsArray[topicsArray.length - 1]?.topic || ''; // เอาหัวข้อสุดท้าย
-        console.log("จำนวนหัวข้อทั้งหมด", topicMaxLength, "สุ่มไปแล้ว", topicsArray.length)
-
-        setCurrentTopic(latestTopic);
-        return topicsArray.map(item => item.topic); // คืนค่าหัวข้อทั้งหมด
-      }
-      return [];
-    } catch (error) {
-      console.error(error);
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
+    const snapshot = await get(ref(db, `${roomPath}/topic`));
+    const topicsArray = snapshotToList(snapshot);
+    console.log("จำนวนหัวข้อทั้งหมด", topicMaxLength, "สุ่มไปแล้ว", topicsArray.length)
+    return topicsArray.map(item => item.topic);
   };
 
-  const fetchUsedNumbers = async () => {
-    setIsLoading(true);
-    const db = getDatabase();
-    const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-
-    try {
-      const snapshot = await get(numbersRef); // ใช้ await เพื่อให้ข้อมูลถูกดึงขึ้นมาก่อน
-      if (snapshot.exists()) {
-        const numbersData = snapshot.val();
-        const numbers = Object.values(numbersData).map(item => item.number);
-        return numbers; // คืนค่า numbers ที่ได้จากฐานข้อมูล
-      } else {
-        console.log("No data available");
-        return []; // ถ้าไม่มีข้อมูล ก็ return เป็น array ว่าง
-      }
-    } catch (error) {
-      console.error(error);
-      return []; // ถ้าเกิด error ก็คืนค่า array ว่าง
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchNumberEntries = async () => {
+    const snapshot = await get(ref(db, `${roomPath}/numbers`));
+    return toNumberEntries(snapshotToList(snapshot));
   };
 
-
-  const generateRandomNumber = async () => {
-    const updatedUsedNumbers = await fetchUsedNumbers(); // ดึงเลขที่ใช้ไปแล้ว
-    setIsLoading(true)
-    if (updatedUsedNumbers?.length >= maxNumber) {
-      alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
-      return setIsLoading(false);
-    }
-
-    setIsLoading(true);
-
-    let randomNumber;
-    do {
-      randomNumber = Math.floor(Math.random() * maxNumber) + 1;
-    } while (updatedUsedNumbers.includes(randomNumber));
-
-    setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
-
-    const db = getDatabase();
-    const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-    const newNumberRef = push(numbersRef);
-    await set(newNumberRef, {
-      number: randomNumber,
-      timestamp: new Date().toISOString(),
+  // จองเลขแบบ atomic: ถ้ามีคนจองเลขนี้ไปก่อน transaction จะไม่ commit
+  const claimNumber = async (number) => {
+    const numberRef = ref(db, `${roomPath}/numbers/${number}`);
+    const result = await runTransaction(numberRef, (current) => {
+      if (current !== null) return; // abort
+      return { owner: clientId, userName, createdAt: serverTimestamp() };
     });
-
-    setIsLoading(false);
+    return result.committed;
   };
 
-  const generateNextNumber = async () => {
-    const updatedUsedNumbers = await fetchUsedNumbers();
-    setIsLoading(true);
-
-    if (myNumbers.length >= 3) {
+  const drawNumber = async () => {
+    if (myNumbers.length >= maxNumbersPerPlayer) {
       alert('คุณสุ่มเลขครบแล้ว');
-      setIsLoading(false);
       return;
     }
 
-    if (updatedUsedNumbers?.length >= maxNumber) {
-      alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
+    setIsLoading(true);
+    try {
+      let usedNumbers = (await fetchNumberEntries()).map(item => item.number);
+      while (true) {
+        const randomNumber = pickRandomUnused(allNumbers, usedNumbers);
+        if (randomNumber === null) {
+          alert('เลขทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์เลขเพื่อสุ่มใหม่');
+          return;
+        }
+        if (await claimNumber(randomNumber)) return;
+        usedNumbers = [...usedNumbers, randomNumber]; // มีคนแย่งไปก่อน สุ่มใหม่
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    let randomNumber;
-    do {
-      randomNumber = Math.floor(Math.random() * maxNumber) + 1; // ✅ Random 1-3
-    } while (updatedUsedNumbers.includes(randomNumber));
-
-    setMyNumbers((prevNumbers) => [...prevNumbers, randomNumber]);
-
-    const db = getDatabase();
-    const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-    const newNumberRef = push(numbersRef);
-    await set(newNumberRef, {
-      number: randomNumber,
-      timestamp: new Date().toISOString(),
-    });
-
-    setIsLoading(false);
   };
 
   const clearUsedNumbers = async () => {
     if (confirm('ยืนยันจะเคลียร์ที่ทุกคนสุ่มไปแล้วไหม')) {
       setIsLoading(true);
-      const db = getDatabase();
-      const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-      remove(numbersRef)
-        .then(() => {
-          setMyNumbers([]);
-          setIsLoading(false);
-        })
-        .catch((error) => {
-          console.error(error);
-          setIsLoading(false);
-        });
+      try {
+        await remove(ref(db, `${roomPath}/numbers`));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   const clearMyNumbers = async () => {
     if (confirm('คุณต้องการเคลียร์เลขที่เคยสุ่มไปแล้วใช่หรือไม่?')) {
       setIsLoading(true);
-      const db = getDatabase();
-      const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-      get(numbersRef).then((snapshot) => {
-        if (snapshot.exists()) {
-          snapshot.forEach(async (childSnapshot) => {
-            const numberData = childSnapshot.val();
-            if (myNumbers.includes(numberData.number)) {
-              remove(childSnapshot.ref);
-            }
-          });
+      try {
+        const entries = await fetchNumberEntries();
+        const updates = {};
+        entries
+          .filter(item => item.owner === clientId)
+          .forEach(item => { updates[`numbers/${item.id}`] = null; });
+        if (Object.keys(updates).length > 0) {
+          await update(ref(db, roomPath), updates);
         }
-        setMyNumbers([]);
-        setIsLoading(false);
         alert('เคลียร์เลขที่สุ่มไปแล้วเรียบร้อย!');
-      }).catch((error) => {
+      } catch (error) {
         console.error(error);
+      } finally {
         setIsLoading(false);
-      });
+      }
     }
   };
 
   const handleRandomTopic = async () => {
     if (confirm('สุ่มหัวข้อใหม่เท่ากับเริ่มเกมใหม่ ยืนยันหรือไม่')) {
       setIsLoading(true);
-      await resetGameData();
 
       try {
+        await resetGameData();
         const usedTopics = await fetchUsedTopics()
+        const randomTopic = pickRandomUnused(topic.data, usedTopics);
 
-        if (usedTopics.length >= topicMaxLength) {
+        if (randomTopic === null) {
           alert('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่');
-          setIsLoading(false);
           return;
         }
 
-        let randomTopic;
-        do {
-          randomTopic = topic.data[Math.floor(Math.random() * topic.data.length)];
-        } while (usedTopics.includes(randomTopic)); // สุ่มใหม่ถ้าซ้ำ
-
-        const db = getDatabase();
-        const topicRef = ref(db, `rooms/${roomId}/topic`);
-
-        const newUsedTopicRef = push(topicRef);
-
-        await set(newUsedTopicRef, {
+        await set(push(ref(db, `${roomPath}/topic`)), {
           topic: randomTopic,
-          timestamp: new Date().toISOString(),
+          createdAt: serverTimestamp(),
         });
-
-        console.log(usedTopics)
         setCurrentTopic(randomTopic);
       } catch (error) {
         console.error("Error fetching topics:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 
   const clearUsedTopics = async () => {
     if (confirm('ยืนยันจะเคลียร์หัวข้อที่เคยสุ่มแล้วหรือไม่?')) {
       setIsLoading(true);
-      const db = getDatabase();
-      const topicRef = ref(db, `rooms/${roomId}/topic`);
-      await remove(topicRef);
-      setCurrentTopic('');
-      setIsLoading(false);
+      try {
+        await remove(ref(db, `${roomPath}/topic`));
+        setCurrentTopic('');
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-
   const resetGameData = async () => {
     try {
-      setMyNumbers([]);
-
-      const db = getDatabase();
-      const numbersRef = ref(db, `rooms/${roomId}/numbers`);
-      remove(numbersRef);
-
-      const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
-      remove(revealNumbersRef);
-
-      await fetchUsedNumbers();
+      await update(ref(db, roomPath), { numbers: null, revealNumbers: null });
     } catch (e) {
       console.error('Error resetting game data: ', e);
     }
   };
 
   const handleClickNumber = async (number) => {
-    const db = getDatabase();
-    const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
+    const revealNumbersRef = ref(db, `${roomPath}/revealNumbers`);
 
-    get(revealNumbersRef).then((snapshot) => {
-      console.log('Firebase Data:', snapshot.val(), 'Exists:', snapshot.exists());
-
-      if (!snapshot.exists()) {
-        if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
-          const newRevealRef = push(revealNumbersRef);
-          set(newRevealRef, {
-            number,
-            userName,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        return;
-      }
-
-      const isNumberRevealed = Object.values(snapshot.val()).some((item) => item.number === number);
+    try {
+      const snapshot = await get(revealNumbersRef);
+      const isNumberRevealed = snapshotToList(snapshot).some((item) => item.number === number);
       if (isNumberRevealed) {
         alert('เลขนี้เคยถูกเปิดเผยแล้ว');
         return;
       }
 
       if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
-        const newRevealRef = push(revealNumbersRef);
-        set(newRevealRef, {
+        await set(push(revealNumbersRef), {
           number,
           userName,
-          timestamp: new Date().toISOString(),
+          createdAt: serverTimestamp(),
         });
       }
-    }).catch((error) => {
+    } catch (error) {
       console.error(error);
-    });
-  };
-
-  const handleResetHeart = () => {
-    updateHeart(3);
-  };
-
-  const handleReduceHeart = () => {
-    if (heart > 0) {
-      updateHeart(heart - 1);
     }
   };
 
-  const updateHeart = async (heartChange) => {
-    const db = getDatabase();
-    const heartRef = ref(db, `rooms/${roomId}/heart`);
-    await set(heartRef, heartChange)
+  const handleResetHeart = () => {
+    set(ref(db, `${roomPath}/heart`), 3);
+  };
+
+  // ใช้ transaction กันกดพร้อมกันแล้วหัวใจลดไม่ครบ
+  const handleReduceHeart = () => {
+    runTransaction(ref(db, `${roomPath}/heart`), (current) => {
+      const value = current ?? 3;
+      if (value <= 0) return; // abort
+      return value - 1;
+    }).catch(console.error);
   };
 
   const copyToClipboard = () => {
@@ -347,46 +253,37 @@ function MainPage() {
   }, []);
 
   useEffect(() => {
-    fetchUsedTopics();
-    fetchUsedNumbers();
-  }, []);
-
-  useEffect(() => {
-    const db = getDatabase();
-    const heartRef = ref(db, `rooms/${roomId}/heart`);
+    const heartRef = ref(db, `${roomPath}/heart`);
     const unsubscribe = onValue(heartRef, (snapshot) => {
       if (snapshot.exists()) {
-        const heartData = snapshot.val();
-        setHeart(heartData);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    const db = getDatabase();
-    const topicRef = ref(db, `rooms/${roomId}/topic`);
-
-    const unsubscribe = onValue(topicRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const topicData = Object.values(snapshot.val()); // แปลง Object เป็น Array
-        const latestTopic = topicData
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-        setCurrentTopic(latestTopic?.topic || '');
+        setHeart(snapshot.val());
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [roomPath]);
 
   useEffect(() => {
-    const db = getDatabase();
-    const roomRef = ref(db, `rooms/${roomId}`);
+    const topicRef = ref(db, `${roomPath}/topic`);
+    const unsubscribe = onValue(topicRef, (snapshot) => {
+      setCurrentTopic(getLatestTopic(snapshotToList(snapshot)));
+    });
 
-    get(roomRef).then((snapshot) => {
+    return () => unsubscribe();
+  }, [roomPath]);
+
+  // sync เลขของตัวเองจาก DB: ถ้ามีคนเริ่มเกมใหม่/เคลียร์เลขทุกคน เลขในจอจะหายตาม
+  useEffect(() => {
+    const numbersRef = ref(db, `${roomPath}/numbers`);
+    const unsubscribe = onValue(numbersRef, (snapshot) => {
+      setMyNumbers(getMyNumbers(toNumberEntries(snapshotToList(snapshot)), clientId));
+    });
+
+    return () => unsubscribe();
+  }, [roomPath, clientId]);
+
+  useEffect(() => {
+    get(ref(db, roomPath)).then((snapshot) => {
       if (!snapshot.exists()) {
         navigate("/");
       }
@@ -395,7 +292,7 @@ function MainPage() {
       alert('somethings wrong ')
       navigate("/");
     });
-  }, [roomId, navigate]);
+  }, [roomPath, navigate]);
 
   useEffect(() => {
     if (userName) {
@@ -446,15 +343,15 @@ function MainPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: "16px", alignItems: 'center', border: '1px solid gray', borderRadius: '4px', padding: "16px" }}>
                 <h2 style={{ margin: "8px" }}>สุ่มเลข 1-{maxNumber}</h2>
 
-                <button className="button-common" style={{ width: "120px" }} disabled={myNumbers.length >= 1} onClick={generateRandomNumber}>สุ่มเลข</button>
-                {myNumbers.length > 0 && myNumbers.length < 3 && <button className="button-common" onClick={generateNextNumber}>สุ่มอีกเลข</button>}
+                <button className="button-common" style={{ width: "120px" }} disabled={myNumbers.length >= 1} onClick={drawNumber}>สุ่มเลข</button>
+                {myNumbers.length > 0 && myNumbers.length < maxNumbersPerPlayer && <button className="button-common" onClick={drawNumber}>สุ่มอีกเลข</button>}
 
                 {myNumbers &&
                   <div style={{ display: 'flex', flexDirection: "column", gap: "16px", alignItems: 'center' }}>
                     <h2 style={{ margin: "16px 0 0", color: myNumbers.length > 0 ? 'default' : 'transparent' }}>เลขที่ออก</h2>
                     <div style={{ display: 'flex', gap: '14px' }}>
                       {myNumbers.map((value) => (
-                        <h1
+                        <h1 key={value}
                           onClick={() => handleClickNumber(value)}
                           style={{
                             width: '79px',

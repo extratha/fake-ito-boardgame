@@ -1,6 +1,7 @@
 import { db } from "../firebase"; // Assuming your db is already initialized properly
 import { useEffect, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
+import { snapshotToList } from "../utils/roomData";
 
 const RevealNumbers = ({ roomId }) => {
 
@@ -10,18 +11,12 @@ const RevealNumbers = ({ roomId }) => {
     const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
 
     const unsubscribe = onValue(revealNumbersRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const revealNumbersData = Object.values(data);
-
-        setRevealNumbers(revealNumbersData);
-      } else {
-        setRevealNumbers([]);
-      }
+      // เรียงตาม push key (เวลา server) ล่าสุดอยู่บน
+      setRevealNumbers(snapshotToList(snapshot).reverse());
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [roomId]);
 
   const RevealedNumber = ({ data, styles }) => <p style={{ margin: '0', fontSize: '16px', fontWeight: 500, ...styles }}>{data}</p>;
 
@@ -40,9 +35,8 @@ const RevealNumbers = ({ roomId }) => {
       top: '3rem',
     }}>
       {revealNumbers
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .map((revealedData, index) => (
-          <div key={index} style={{
+        .map((revealedData) => (
+          <div key={revealedData.id} style={{
             width: "80px",
             padding: "8px",
             borderRadius: "8px",
