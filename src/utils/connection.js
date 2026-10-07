@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../firebase';
+import { showAlert } from '../Dialog/dialogStore';
 
 // ถ้าต่อ server ไม่ได้ Firebase SDK จะเก็บคำสั่งไว้ในคิวและรอไปเรื่อย ๆ โดยไม่ throw
 // จึงต้องใส่ timeout เองเพื่อให้ผู้เล่นรู้ว่ามีปัญหา
@@ -25,7 +26,7 @@ export const withTimeout = (promise, action = 'database operation', ms = DB_TIME
 export const reportDbError = (error, action) => {
   console.error(`[db] ${action} failed:`, error);
   if (error instanceof DbTimeoutError) {
-    alert('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง');
+    showAlert('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง', { title: 'เชื่อมต่อไม่ได้' });
   }
 };
 

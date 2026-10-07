@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import Cookies from 'js-cookie';
 import * as fakeDb from '../testUtils/fakeDatabase';
 import { DB_TIMEOUT_MS } from '../utils/connection';
+import { showAlert } from '../Dialog/dialogStore';
 import WelcomePage, { ROOM_ID_CHARS, generateRoomId, normalizeRoomId } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
+jest.mock('../Dialog/dialogStore', () => ({ showAlert: jest.fn() }));
 const mockNavigate = jest.fn();
 jest.mock('react-router', () => ({ useNavigate: () => mockNavigate }));
 
@@ -15,7 +17,7 @@ beforeEach(() => {
   mockNavigate.mockReset();
   Cookies.set('userName', 'Alice');
   Cookies.set('clientId', 'client-alice');
-  window.alert = jest.fn();
+  showAlert.mockReset();
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -45,7 +47,7 @@ test('DB ต่อไม่ได้: ปุ่มขึ้นกำลังส
   expect(screen.getByText('กำลังสร้างห้อง...')).toBeDisabled();
 
   await act(async () => { jest.advanceTimersByTime(DB_TIMEOUT_MS); });
-  expect(window.alert).toHaveBeenCalledWith('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง');
+  expect(showAlert).toHaveBeenCalledWith('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง', expect.objectContaining({ title: 'เชื่อมต่อไม่ได้' }));
   expect(console.error).toHaveBeenCalledWith('[db] create room failed:', expect.anything());
   expect(screen.getByText('สร้างห้องใหม่')).not.toBeDisabled();
   expect(mockNavigate).not.toHaveBeenCalled();

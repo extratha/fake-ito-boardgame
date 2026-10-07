@@ -4,10 +4,12 @@ import Cookies from 'js-cookie';
 import * as fakeDb from '../testUtils/fakeDatabase';
 import topic from '../constant/topic.json';
 import { HOST_GRACE_MS } from '../hooks/useHost';
+import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import MainPage from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
+jest.mock('../Dialog/dialogStore', () => ({ showAlert: jest.fn(), showConfirm: jest.fn() }));
 const mockNavigate = jest.fn();
 jest.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
@@ -31,6 +33,7 @@ const renderPage = async () => {
 
 const click = async (text) => {
   userEvent.click(await screen.findByText(text));
+  await act(async () => {}); // ให้ dialog (mock) resolve และเริ่ม loading ก่อน
   await screen.findByText('หัวข้อ:'); // รอให้ loading จบ
 };
 
@@ -41,8 +44,8 @@ beforeEach(() => {
   seedRoom();
   Cookies.set('userName', 'Alice');
   Cookies.set('clientId', ME);
-  window.confirm = jest.fn(() => true);
-  window.alert = jest.fn();
+  showConfirm.mockReset().mockResolvedValue(true);
+  showAlert.mockReset().mockResolvedValue(undefined);
   jest.spyOn(Math, 'random').mockReturnValue(0);
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -102,7 +105,7 @@ describe('topic', () => {
     await renderPage();
     await click('สุ่มหัวข้อ');
 
-    expect(window.alert).toHaveBeenCalledWith('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่');
+    expect(showAlert).toHaveBeenCalledWith('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่', expect.objectContaining({ title: 'หัวข้อหมดแล้ว' }));
     expect(Object.keys(fakeDb.__getData(`${ROOM}/topic`))).toHaveLength(topic.data.length);
   });
 
@@ -255,11 +258,11 @@ describe('deal numbers', () => {
 
   test('แจกใหม่กลางรอบต้องยืนยันก่อน ถ้ายกเลิกเลขเดิมไม่เปลี่ยน', async () => {
     seedRoom({ numbers: { 42: { owner: ME, createdAt: 1 } } });
-    window.confirm = jest.fn(() => false);
+    showConfirm.mockResolvedValue(false);
     await renderPage();
     userEvent.click(screen.getByText('แจกเลขใหม่ (1 คน)'));
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('แจกเลขใหม่ = เริ่มรอบใหม่'));
+    expect(showConfirm).toHaveBeenCalledWith(expect.stringContaining('แจกเลขใหม่ = เริ่มรอบใหม่'), expect.objectContaining({ title: 'แจกเลขใหม่?' }));
     expect(fakeDb.__getData(`${ROOM}/numbers`)).toEqual({ 42: { owner: ME, createdAt: 1 } });
   });
 
@@ -269,7 +272,7 @@ describe('deal numbers', () => {
     await renderPage();
     userEvent.click(screen.getByText('แจกเลข (35 คน)'));
 
-    expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('เกิน 100 เลข'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('เกิน 100 เลข'), expect.objectContaining({ title: 'เลขไม่พอแจก' }));
     expect(fakeDb.__getData(`${ROOM}/numbers`)).toBeNull();
   });
 
@@ -340,7 +343,7 @@ describe('reveal', () => {
     ]);
 
     userEvent.click(screen.getAllByRole('heading', { level: 1, name: '42' })[0]);
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith('เลขนี้เคยถูกเปิดเผยแล้ว'));
+    await waitFor(() => expect(showAlert).toHaveBeenCalledWith('เลขนี้เคยถูกเปิดเผยแล้ว'));
     expect(Object.keys(fakeDb.__getData(`${ROOM}/revealNumbers`))).toHaveLength(1);
   });
 });
@@ -380,7 +383,7 @@ describe('connection', () => {
     expect(screen.getByText('กำลังโหลด...')).toBeInTheDocument();
 
     await act(async () => { jest.advanceTimersByTime(8000); });
-    expect(window.alert).toHaveBeenCalledWith('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง');
+    expect(showAlert).toHaveBeenCalledWith('เชื่อมต่อฐานข้อมูลไม่ได้ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง', expect.objectContaining({ title: 'เชื่อมต่อไม่ได้' }));
     expect(screen.getByText('แจกเลข (1 คน)')).toBeInTheDocument();
   });
 });

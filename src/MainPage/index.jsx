@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router';
 import CopyIcon from "../icons/copy.svg";
 import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
+import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
 import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
@@ -64,10 +65,10 @@ function MainPage() {
   const handleDealNumbers = async () => {
     if (onlinePlayers.length === 0) return;
     if (onlinePlayers.length * numbersPerPlayer > maxNumber) {
-      alert(`ผู้เล่น ${onlinePlayers.length} คน คนละ ${numbersPerPlayer} เลข เกิน ${maxNumber} เลข ลดจำนวนเลขต่อคนก่อนนะ`);
+      showAlert(`ผู้เล่น ${onlinePlayers.length} คน คนละ ${numbersPerPlayer} เลข เกิน ${maxNumber} เลข ลดจำนวนเลขต่อคนก่อนนะ`, { title: 'เลขไม่พอแจก' });
       return;
     }
-    if (numberEntries.length > 0 && !confirm('แจกเลขใหม่ = เริ่มรอบใหม่ เลขเดิมและเลขที่เปิดแล้วจะหายไป ยืนยันหรือไม่')) {
+    if (numberEntries.length > 0 && !(await showConfirm('แจกเลขใหม่ = เริ่มรอบใหม่ เลขเดิมและเลขที่เปิดแล้วจะหายไป ยืนยันหรือไม่', { title: 'แจกเลขใหม่?', confirmText: 'แจกใหม่' }))) {
       return;
     }
 
@@ -89,7 +90,7 @@ function MainPage() {
   };
 
   const handleRandomTopic = async () => {
-    if (confirm('สุ่มหัวข้อใหม่เท่ากับเริ่มเกมใหม่ ยืนยันหรือไม่')) {
+    if (await showConfirm('สุ่มหัวข้อใหม่เท่ากับเริ่มเกมใหม่ ยืนยันหรือไม่', { title: 'สุ่มหัวข้อใหม่?', confirmText: 'สุ่มเลย' })) {
       setIsLoading(true);
 
       try {
@@ -98,7 +99,7 @@ function MainPage() {
         const randomTopic = pickRandomUnused(topic.data, usedTopics);
 
         if (randomTopic === null) {
-          alert('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่');
+          showAlert('หัวข้อทั้งหมดถูกใช้ไปแล้ว! กรุณาเคลียร์หัวข้อเพื่อเริ่มใหม่', { title: 'หัวข้อหมดแล้ว' });
           return;
         }
 
@@ -116,7 +117,7 @@ function MainPage() {
   };
 
   const clearUsedTopics = async () => {
-    if (confirm('ยืนยันจะเคลียร์หัวข้อที่เคยสุ่มแล้วหรือไม่?')) {
+    if (await showConfirm('ยืนยันจะเคลียร์หัวข้อที่เคยสุ่มแล้วหรือไม่?', { title: 'เคลียร์หัวข้อ?', confirmText: 'เคลียร์', tone: 'danger' })) {
       setIsLoading(true);
       try {
         await withTimeout(remove(ref(db, `${roomPath}/topic`)), 'clear topics');
@@ -139,11 +140,11 @@ function MainPage() {
       const snapshot = await withTimeout(get(revealNumbersRef), 'fetch revealed numbers');
       const isNumberRevealed = snapshotToList(snapshot).some((item) => item.number === number);
       if (isNumberRevealed) {
-        alert('เลขนี้เคยถูกเปิดเผยแล้ว');
+        showAlert('เลขนี้เคยถูกเปิดเผยแล้ว');
         return;
       }
 
-      if (confirm('เปิดเผยเลขของคุณให้สังคมรับรู้')) {
+      if (await showConfirm('เปิดเผยเลขของคุณให้สังคมรับรู้', { title: `เปิดเลข ${number}?`, confirmText: 'เปิดเลย' })) {
         await withTimeout(set(push(revealNumbersRef), {
           number,
           userName,

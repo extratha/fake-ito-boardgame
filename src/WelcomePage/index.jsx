@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
 import { withTimeout, reportDbError } from "../utils/connection";
+import { showAlert } from "../Dialog/dialogStore";
 import { getClientId } from "../utils/clientId";
 import { cleanupRooms } from "../utils/roomCleanup";
 import OnlineRooms from "../OnlineRooms";
@@ -44,7 +45,7 @@ const WelcomePage = () => {
   };
 
   const handleCreateRoom = async () => {
-    if (!userName) return alert('กรุณาระบุชื่อผู้เล่น')
+    if (!userName) return showAlert('กรุณาระบุชื่อผู้เล่น')
 
     const db = getDatabase();
     setIsCreating(true);
@@ -70,8 +71,8 @@ const WelcomePage = () => {
   };
 
   const joinRoom = (targetRoomId) => {
-    if (!userName) return alert('กรุณาระบุชื่อผู้เล่น')
-    if (!targetRoomId) return alert('กรุณากรอกรหัสห้อง');
+    if (!userName) return showAlert('กรุณาระบุชื่อผู้เล่น')
+    if (!targetRoomId) return showAlert('กรุณากรอกรหัสห้อง');
     navigate(`/room/${normalizeRoomId(targetRoomId)}`); // ไปยังห้องที่ป้อนรหัส
   };
 
