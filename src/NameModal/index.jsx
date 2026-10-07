@@ -2,6 +2,7 @@ import './NameModal.css'
 import '../App.css'
 import Cookies from 'js-cookie';
 import { useState } from 'react';
+import { showAlert } from '../Dialog/dialogStore';
 
 
 const NameModal = ({ userName, setUserName, setShowNameModal}) => {
@@ -14,7 +15,7 @@ const NameModal = ({ userName, setUserName, setShowNameModal}) => {
       Cookies.set('userName', tmpUserName.trim(), { expires: 7 });
       setShowNameModal(false);
     } else {
-      alert('ชื่อห้ามว่างนะนายจ๋า');
+      showAlert('ชื่อห้ามว่างนะนายจ๋า');
     }
   }
 

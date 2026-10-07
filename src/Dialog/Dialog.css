@@ -1,0 +1,56 @@
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30; /* เหนือ NameModal และ reveal panel */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: dialog-fade 150ms ease-out;
+}
+
+.dialog-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  padding: 24px 20px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card-raised);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: tile-pop 220ms var(--ease-out);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.dialog-message {
+  margin: 0;
+  color: var(--color-fg);
+  white-space: pre-line;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.dialog-actions .button-common {
+  flex: 1;
+  max-width: 160px;
+}
+
+@keyframes dialog-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

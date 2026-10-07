@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ref, onValue, onDisconnect, update, set, runTransaction, serverTimestamp } from 'firebase/database';
+import { ref, onValue, onDisconnect, update, set, remove, runTransaction, serverTimestamp } from 'firebase/database';
 import { db } from '../firebase';
 import { snapshotToList } from '../utils/roomData';
 
@@ -20,6 +20,8 @@ export const useRoomPresence = ({ roomId, clientId, userName, enabled }) => {
 
     const playerRef = ref(db, `rooms/${roomId}/players/${clientId}`);
     const lastSeenRef = ref(db, `roomIndex/${roomId}/lastSeen`);
+    // รายชื่อคนออนไลน์ใน index (เล็ก) ให้หน้า lobby นับคนได้โดยไม่ต้องโหลดข้อมูลห้อง
+    const lobbyOnlineRef = ref(db, `roomIndex/${roomId}/online/${clientId}`);
 
     const unsubscribe = onValue(ref(db, '.info/connected'), async (snapshot) => {
       if (snapshot.val() !== true) return;
@@ -27,7 +29,9 @@ export const useRoomPresence = ({ roomId, clientId, userName, enabled }) => {
         // ลงทะเบียน onDisconnect ก่อน แล้วค่อยประกาศว่าออนไลน์ (ถ้าหลุดระหว่างนี้ server จะ mark offline ให้)
         await onDisconnect(playerRef).update({ online: false, lastSeen: serverTimestamp() });
         await onDisconnect(lastSeenRef).set(serverTimestamp());
+        await onDisconnect(lobbyOnlineRef).remove();
         await update(playerRef, { name: userName, online: true, lastSeen: serverTimestamp() });
+        await set(lobbyOnlineRef, userName);
         await runTransaction(ref(db, `rooms/${roomId}/players/${clientId}/joinedAt`), (current) => current ?? serverTimestamp());
         await set(lastSeenRef, serverTimestamp());
       } catch (error) {
@@ -40,7 +44,9 @@ export const useRoomPresence = ({ roomId, clientId, userName, enabled }) => {
       // ออกจากห้องเอง (กดย้อนกลับ) ไม่ต้องรอ server จับว่าหลุด
       onDisconnect(playerRef).cancel().catch(() => {});
       onDisconnect(lastSeenRef).cancel().catch(() => {});
+      onDisconnect(lobbyOnlineRef).cancel().catch(() => {});
       update(playerRef, { online: false, lastSeen: serverTimestamp() }).catch(() => {});
+      remove(lobbyOnlineRef).catch(() => {});
       set(lastSeenRef, serverTimestamp()).catch(() => {});
     };
   }, [roomId, clientId, userName, enabled]);

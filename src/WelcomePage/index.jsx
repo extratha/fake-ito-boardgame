@@ -1,10 +1,37 @@
-import { getDatabase, ref, update, serverTimestamp } from "firebase/database";
+import { getDatabase, ref, update, get, serverTimestamp } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import Cookies from 'js-cookie';
 import { withTimeout, reportDbError } from "../utils/connection";
+import { showAlert } from "../Dialog/dialogStore";
 import { getClientId } from "../utils/clientId";
 import { cleanupRooms } from "../utils/roomCleanup";
+import OnlineRooms from "../OnlineRooms";
+
+// รหัสห้อง 4 ตัว: ตัวพิมพ์ใหญ่ + ตัวเลข ตัดตัวที่หน้าตาคล้ายกัน (0/O, 1/I/L) ออก ให้บอกกันปากเปล่าได้
+export const ROOM_ID_LENGTH = 4;
+export const ROOM_ID_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const MAX_ROOM_ID_ATTEMPTS = 10;
+
+export const generateRoomId = (length = ROOM_ID_LENGTH) => {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => ROOM_ID_CHARS[byte % ROOM_ID_CHARS.length]).join('');
+};
+
+// รหัสแบบใหม่พิมพ์ตัวเล็กได้ ส่วนห้องเก่า (8 ตัว ตัวเล็ก/ใหญ่มีผล) ใช้ตามที่พิมพ์
+export const normalizeRoomId = (value) =>
+  value.length === ROOM_ID_LENGTH ? value.toUpperCase() : value;
+
+// สุ่มจนได้รหัสที่ยังไม่มีห้องใช้อยู่
+const findFreeRoomId = async (db) => {
+  for (let attempt = 0; attempt < MAX_ROOM_ID_ATTEMPTS; attempt++) {
+    const roomId = generateRoomId();
+    const snapshot = await withTimeout(get(ref(db, `rooms/${roomId}`)), 'check room id');
+    if (!snapshot.exists()) return roomId;
+  }
+  throw new Error('could not find a free room id');
+};
 
 const WelcomePage = () => {
   const [userName, setUserName] = useState('');
@@ -16,25 +43,14 @@ const WelcomePage = () => {
     setUserName(event.target.value)
     Cookies.set('userName', event.target.value, { expires: 7 });
   };
-  // ฟังก์ชันสุ่มรหัสห้องที่มีทั้งตัวเลข พิมพ์เล็ก พิมพ์ใหญ่
-  const generateRoomId = (length = 8) => {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    const array = new Uint8Array(length);
-    crypto.getRandomValues(array);
-    array.forEach(byte => {
-      result += characters[byte % characters.length];
-    });
-    return result;
-  };
 
   const handleCreateRoom = async () => {
-    if (!userName) return alert('กรุณาระบุชื่อผู้เล่น')
+    if (!userName) return showAlert('กรุณาระบุชื่อผู้เล่น')
 
     const db = getDatabase();
-    const newRoomId = generateRoomId(); // สุ่มรหัสห้อง
     setIsCreating(true);
     try {
+      const newRoomId = await findFreeRoomId(db);
       // เขียนห้อง + roomIndex พร้อมกัน (roomIndex ใช้ลบห้องที่ร้างโดยไม่ต้องโหลดข้อมูลทุกห้อง)
       await withTimeout(update(ref(db), {
         [`rooms/${newRoomId}`]: {
@@ -44,7 +60,7 @@ const WelcomePage = () => {
           settings: { numbersPerPlayer: 1 },
           createdAt: serverTimestamp(),
         },
-        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp() },
+        [`roomIndex/${newRoomId}`]: { createdAt: serverTimestamp(), lastSeen: serverTimestamp(), hostName: userName },
       }), 'create room');
       navigate(`/room/${newRoomId}`); // ไปยังห้องใหม่
     } catch (error) {
@@ -54,11 +70,13 @@ const WelcomePage = () => {
     }
   };
 
-  const handleJoinRoom = () => {
-    if (!userName) return alert('กรุณาระบุชื่อผู้เล่น')
-    if (!roomId) return alert('กรุณากรอกรหัสห้อง');
-    navigate(`/room/${roomId}`); // ไปยังห้องที่ป้อนรหัส
+  const joinRoom = (targetRoomId) => {
+    if (!userName) return showAlert('กรุณาระบุชื่อผู้เล่น')
+    if (!targetRoomId) return showAlert('กรุณากรอกรหัสห้อง');
+    navigate(`/room/${normalizeRoomId(targetRoomId)}`); // ไปยังห้องที่ป้อนรหัส
   };
+
+  const handleJoinRoom = () => joinRoom(roomId);
 
   const initUsername = () => {
     const value = Cookies.get('userName')
@@ -95,6 +113,8 @@ const WelcomePage = () => {
           </label>
         </section>
 
+        <OnlineRooms onJoin={joinRoom} />
+
         <section className="card">
           <h2 className="card-title">เข้าร่วมห้อง</h2>
           <label className="field btn-block">
@@ -103,8 +123,8 @@ const WelcomePage = () => {
               className="text-input"
               value={roomId}
               onChange={(e) => setRoomId(e.target.value.trim())}
-              placeholder="รหัสห้อง"
-              autoCapitalize="off"
+              placeholder="รหัสห้อง 4 ตัว"
+              autoCapitalize="characters"
               autoCorrect="off"
             />
           </label>
