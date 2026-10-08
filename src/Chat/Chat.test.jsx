@@ -1,7 +1,7 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as fakeDb from '../testUtils/fakeDatabase';
-import Chat, { CHAT_HISTORY_LIMIT, CHAT_MAX_LENGTH } from '.';
+import Chat, { CHAT_HISTORY_LIMIT, CHAT_MAX_LENGTH, CHAT_COOLDOWN_MS } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
@@ -48,4 +48,34 @@ test(`โหลดแค่ ${CHAT_HISTORY_LIMIT} ข้อความล่า
 test(`จำกัดความยาวข้อความ ${CHAT_MAX_LENGTH} ตัวอักษร`, () => {
   renderChat();
   expect(screen.getByLabelText('ข้อความ')).toHaveAttribute('maxLength', String(CHAT_MAX_LENGTH));
+});
+
+test('ส่งแล้วต้องรอ cooldown ก่อนส่งข้อความถัดไป', async () => {
+  renderChat();
+  const input = screen.getByLabelText('ข้อความ');
+  userEvent.type(input, 'หนึ่ง{enter}');
+  await waitFor(() => expect(input).toHaveValue(''));
+
+  userEvent.type(input, 'สอง{enter}');
+  expect(screen.getByRole('button', { name: 'รอสักครู่' })).toBeDisabled();
+  expect(Object.values(fakeDb.__getData(`${ROOM}/chat`))).toHaveLength(1);
+  expect(input).toHaveValue('สอง');
+
+  expect(await screen.findByRole('button', { name: 'ส่ง' }, { timeout: CHAT_COOLDOWN_MS + 1000 })).toBeEnabled();
+}, CHAT_COOLDOWN_MS + 3000);
+
+test(`เก็บแชทแค่ ${CHAT_HISTORY_LIMIT} ข้อความ ลบของเก่าที่เกินตอนส่งใหม่`, async () => {
+  const chat = Object.fromEntries(Array.from({ length: CHAT_HISTORY_LIMIT }, (_, i) => [
+    `-k${String(i).padStart(4, '0')}`, { clientId: 'bob', userName: 'Bob', text: `msg ${i}` },
+  ]));
+  fakeDb.__reset({ rooms: { room1: { chat } } });
+  renderChat();
+  const input = screen.getByLabelText('ข้อความ');
+  userEvent.type(input, 'ใหม่{enter}');
+  await waitFor(() => expect(input).toHaveValue(''));
+
+  const stored = fakeDb.__getData(`${ROOM}/chat`);
+  expect(Object.keys(stored)).toHaveLength(CHAT_HISTORY_LIMIT);
+  expect(stored['-k0000']).toBeUndefined();
+  expect(Object.values(stored).some((m) => m.text === 'ใหม่')).toBe(true);
 });
