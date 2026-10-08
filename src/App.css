@@ -227,10 +227,11 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 14px;
+  margin: 8px 0;
 }
 
 .number-tile {
-  width: 84px;
+  min-width: 84px;
   margin: 0;
   padding: 10px 12px;
   border-radius: var(--radius-md);
@@ -251,6 +252,19 @@
 .number-tile:active {
   transform: translateY(5px);
   box-shadow: 0 0 0 #111, 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* เลขของเราที่โดนข้าม: เรืองแสงแดงรอบการ์ดและสั่นเบา ๆ ค้างไว้จนกว่าจะแจกเลขใหม่ */
+.number-tile.is-skipped {
+  animation: tile-pop 260ms var(--ease-out), tile-skipped 1.4s ease-in-out infinite;
+}
+
+@keyframes tile-skipped {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5)); rotate: 0deg; }
+  15% { rotate: -2deg; }
+  30% { rotate: 2deg; }
+  45% { rotate: 0deg; }
+  50% { filter: drop-shadow(0 0 16px rgba(239, 68, 68, 1)); }
 }
 
 @keyframes tile-pop {
@@ -288,9 +302,10 @@
    ขนาดการ์ดต้องเท่าเดิมทุกสถานะ: ถ้าย่อตอนติดขอบ sentinel จะเลื่อนแล้วสลับสถานะวนจนกระพริบ */
 .heart-card {
   position: sticky;
-  bottom: calc(8px + env(safe-area-inset-bottom));
+  /* bottom: calc(8px + env(safe-area-inset-bottom)); */
+  top:calc(10px + env(safe-area-inset-top));
   z-index: 4;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 12px;
@@ -303,8 +318,8 @@
 }
 
 .heart-card .heart {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
 }
 
 .heart-card .button-row {

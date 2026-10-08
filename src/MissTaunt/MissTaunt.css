@@ -1,0 +1,28 @@
+.miss-taunt {
+  position: fixed;
+  z-index: 60;
+  max-width: min(70vw, 280px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, #ffffff, #f1f2f4);
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: miss-taunt 4s ease both;
+}
+
+/* โผล่เร็ว ค้างไว้ แล้วค่อย ๆ จางหายใน ~0.6 วินาทีสุดท้าย */
+@keyframes miss-taunt {
+  0% { opacity: 0; scale: 0.8; }
+  6% { opacity: 1; scale: 1.05; }
+  10%, 85% { opacity: 1; scale: 1; }
+  100% { opacity: 0; scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miss-taunt { animation-name: miss-taunt-fade; }
+  @keyframes miss-taunt-fade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+}

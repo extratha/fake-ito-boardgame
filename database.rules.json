@@ -58,6 +58,12 @@
           }
         },
 
+        "taunt": {
+          "id": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "index": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+
         "chat": {
           "$id": {
             "clientId": { ".validate": "newData.isString() && newData.val().length <= 64" },

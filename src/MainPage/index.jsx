@@ -11,11 +11,12 @@ import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
 import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
-import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers } from '../utils/roomData';
+import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, getNewlySkipped } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
 import Chat from '../Chat';
+import MissTaunt, { createTauntEvent } from '../MissTaunt';
 
 import '../App.css'
 import NameModal from '../NameModal';
@@ -29,6 +30,7 @@ function MainPage() {
   const [userName, setUserName] = useState('');
   const [clientId] = useState(getClientId);
   const [numberEntries, setNumberEntries] = useState([]);
+  const [revealedNumbers, setRevealedNumbers] = useState([]);
   const [numbersPerPlayer, setNumbersPerPlayer] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
@@ -46,6 +48,7 @@ function MainPage() {
   const { hostId, hostName, isHost } = useHost({ roomPath, clientId, userName, players });
 
   const myNumbers = useMemo(() => getMyNumbers(numberEntries, clientId), [numberEntries, clientId]);
+  const skippedNumbers = useMemo(() => new Set(getSkippedNumbers(numberEntries, revealedNumbers)), [numberEntries, revealedNumbers]);
   const dealtOwners = useMemo(() => new Set(numberEntries.map(item => item.owner).filter(Boolean)), [numberEntries]);
   const onlinePlayers = getOnlinePlayers(players);
 
@@ -81,7 +84,7 @@ function MainPage() {
           numbers[number] = { owner: player.id, userName: player.name, createdAt: serverTimestamp() };
         });
       });
-      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null }), 'deal numbers');
+      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null, taunt: null }), 'deal numbers');
     } catch (error) {
       reportDbError(error, 'deal numbers');
     } finally {
@@ -131,7 +134,7 @@ function MainPage() {
   };
 
   const resetGameData = () =>
-    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null }), 'reset game');
+    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null, taunt: null }), 'reset game');
 
   const handleClickNumber = async (number) => {
     const revealNumbersRef = ref(db, `${roomPath}/revealNumbers`);
@@ -145,11 +148,16 @@ function MainPage() {
       }
 
       if (await showConfirm('เปิดเผยเลขของคุณให้สังคมรับรู้', { title: `เปิดเลข ${number}?`, confirmText: 'เปิดเลย' })) {
-        await withTimeout(set(push(revealNumbersRef), {
-          number,
-          userName,
-          createdAt: serverTimestamp(),
-        }), 'reveal number');
+        const revealedBefore = snapshotToList(snapshot).map((item) => item.number);
+        // ลงแล้วลงเลย: เก็บเลขที่เปิดไว้เสมอ แม้เปิดผิดลำดับ
+        await withTimeout(set(push(revealNumbersRef), { number, userName, createdAt: serverTimestamp() }), 'reveal number');
+        // เปิดแล้วข้ามเลขของคนอื่น = รอบนี้ failed: เขียน event ลง DB ให้ทุกคนเห็นข้อความแซวคำเดียวกัน
+        // เขียนได้ครั้งเดียวต่อรอบ (transaction ไม่ทับถ้ามีอยู่แล้ว) จนกว่าจะแจกเลขใหม่/รีเซ็ต แล้วค่อยแซวได้อีก
+        // แยกจากการบันทึกเลข: ข้อความแซวเขียนไม่สำเร็จก็ไม่กระทบเลขที่เปิดไปแล้ว
+        if (getNewlySkipped(numberEntries, revealedBefore, number).length > 0) {
+          runTransaction(ref(db, `${roomPath}/taunt`), (current) => (current ? undefined : createTauntEvent()))
+            .catch((error) => console.warn('[taunt]', error));
+        }
       }
     } catch (error) {
       reportDbError(error, 'reveal number');
@@ -218,6 +226,13 @@ function MainPage() {
       setNumberEntries(toNumberEntries(snapshotToList(snapshot)));
     });
 
+    return () => unsubscribe();
+  }, [roomPath]);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(db, `${roomPath}/revealNumbers`), (snapshot) => {
+      setRevealedNumbers(snapshotToList(snapshot).map((item) => item.number));
+    });
     return () => unsubscribe();
   }, [roomPath]);
 
@@ -329,7 +344,8 @@ function MainPage() {
                     {myNumbers.map((value) => (
                       <h1
                         key={value}
-                        className="number-tile"
+                        className={`number-tile ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
+                        title={skippedNumbers.has(value) ? 'เลขนี้โดนข้ามไปแล้ว' : undefined}
                         role="heading"
                         aria-level={1}
                         tabIndex={0}
@@ -346,10 +362,11 @@ function MainPage() {
               }
             </section>
 
-            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
             <HeartDisplay heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
             <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
             <RevealNumbers roomId={roomId} />
+            <MissTaunt roomPath={roomPath} />
           </div>
         }
         {

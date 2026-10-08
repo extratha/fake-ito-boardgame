@@ -1,4 +1,4 @@
-import { getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range } from './roomData';
+import { getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range, getSkippedNumbers, getNewlySkipped } from './roomData';
 
 test('getLatestTopic คืนตัวสุดท้าย หรือ string ว่าง', () => {
   expect(getLatestTopic([{ topic: 'a' }, { topic: 'b' }])).toBe('b');
@@ -63,4 +63,25 @@ test('getOnlinePlayers / pickHostCandidate เลือกคนออนไล�
   expect(getOnlinePlayers(players).map((p) => p.id)).toEqual(['early', 'late', 'noJoin']);
   expect(pickHostCandidate(players).id).toBe('early');
   expect(pickHostCandidate([{ id: 'x', online: false }])).toBeNull();
+});
+
+describe('เลขที่โดนข้าม', () => {
+  const entries = [10, 20, 30, 40].map((number) => ({ number }));
+
+  test('getSkippedNumbers: เลขที่ยังไม่เปิดและน้อยกว่าเลขสูงสุดที่เปิดแล้ว', () => {
+    expect(getSkippedNumbers(entries, [])).toEqual([]);
+    expect(getSkippedNumbers(entries, [10, 20])).toEqual([]);
+    expect(getSkippedNumbers(entries, [40])).toEqual([10, 20, 30]);
+    expect(getSkippedNumbers(entries, [40, 20])).toEqual([10, 20, 30]); // 20 ถูกเปิดทีหลัง ยังถือว่าโดนข้าม
+    expect(getSkippedNumbers(entries, [10, 20, 40])).toEqual([30]);
+  });
+
+  test('getNewlySkipped: นับเฉพาะเลขที่เพิ่งโดนข้ามจากการเปิดครั้งนี้', () => {
+    expect(getNewlySkipped(entries, [], 10)).toEqual([]);
+    expect(getNewlySkipped(entries, [10], 30)).toEqual([20]);
+    expect(getNewlySkipped(entries, [], 30)).toEqual([10, 20]);
+    // เปิดเลขที่ถูกข้ามอยู่แล้วทีหลัง / เปิดเรียงถูก ไม่ใช่พลาดใหม่
+    expect(getNewlySkipped(entries, [40], 10)).toEqual([]);
+    expect(getNewlySkipped(entries, [10], 20)).toEqual([]);
+  });
 });
