@@ -408,6 +408,21 @@ describe('เปิดเลขข้ามคนอื่น', () => {
   });
 });
 
+describe('เลขที่เปิดไปแล้ว', () => {
+  test('การ์ดที่เปิดแล้วเป็นสีเทา ที่ยังไม่เปิดคงสีเดิม', async () => {
+    seedRoom({
+      numbers: { 10: { owner: ME, createdAt: 1 }, 20: { owner: ME, createdAt: 2 } },
+      revealNumbers: { '-a': { number: 10, userName: 'Alice' } },
+    });
+    await renderPage();
+    const opened = screen.getByRole('heading', { level: 1, name: '10' });
+    const unopened = screen.getByRole('heading', { level: 1, name: '20' });
+    expect(opened).toHaveClass('is-revealed');
+    expect(opened.style.color).toBe('');
+    expect(unopened).not.toHaveClass('is-revealed');
+  });
+});
+
 describe('heart', () => {
   test('กดลดหัวใจพร้อมกันหลายครั้งแล้วลดครบ และรีหัวใจได้', async () => {
     await renderPage();

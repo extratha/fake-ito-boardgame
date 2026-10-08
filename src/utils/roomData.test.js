@@ -1,4 +1,4 @@
-import { getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range, getSkippedNumbers, getNewlySkipped } from './roomData';
+import { getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range, getSkippedNumbers, getNewlySkipped, numberColor } from './roomData';
 
 test('getLatestTopic คืนตัวสุดท้าย หรือ string ว่าง', () => {
   expect(getLatestTopic([{ topic: 'a' }, { topic: 'b' }])).toBe('b');

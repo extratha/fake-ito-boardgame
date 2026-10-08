@@ -7,6 +7,7 @@ import { showAlert } from "../Dialog/dialogStore";
 import { getClientId } from "../utils/clientId";
 import { cleanupRooms } from "../utils/roomCleanup";
 import OnlineRooms from "../OnlineRooms";
+import { numberColor } from "../utils/roomData";
 
 // รหัสห้อง 4 ตัว: ตัวพิมพ์ใหญ่ + ตัวเลข ตัดตัวที่หน้าตาคล้ายกัน (0/O, 1/I/L) ออก ให้บอกกันปากเปล่าได้
 export const ROOM_ID_LENGTH = 4;
@@ -104,9 +105,9 @@ const WelcomePage = () => {
       <div className="stack welcome">
         <header className="welcome-hero">
           <div className="welcome-dice" aria-hidden="true">
-            <span style={{ color: 'hsl(200, 100%, 40%)' }}>1</span>
-            <span style={{ color: 'hsl(100, 100%, 40%)' }}>50</span>
-            <span style={{ color: 'hsl(2, 100%, 40%)' }}>100</span>
+            <span style={{ color: numberColor(1) }}>1</span>
+            <span style={{ color: numberColor(50) }}>50</span>
+            <span style={{ color: numberColor(100) }}>100</span>
           </div>
           <h1 className="welcome-title">Fake Ito Board Game</h1>
           <p className="hint">ใบ้คำตามเลขลับ แล้วเปิดไพ่เรียงจากน้อยไปมาก</p>

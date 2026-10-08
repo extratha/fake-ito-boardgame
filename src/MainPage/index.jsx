@@ -11,7 +11,7 @@ import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
 import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
-import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, getNewlySkipped } from '../utils/roomData';
+import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, getNewlySkipped, numberColor } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
@@ -48,6 +48,7 @@ function MainPage() {
   const { hostId, hostName, isHost } = useHost({ roomPath, clientId, userName, players });
 
   const myNumbers = useMemo(() => getMyNumbers(numberEntries, clientId), [numberEntries, clientId]);
+  const revealedSet = useMemo(() => new Set(revealedNumbers), [revealedNumbers]);
   const skippedNumbers = useMemo(() => new Set(getSkippedNumbers(numberEntries, revealedNumbers)), [numberEntries, revealedNumbers]);
   const dealtOwners = useMemo(() => new Set(numberEntries.map(item => item.owner).filter(Boolean)), [numberEntries]);
   const onlinePlayers = getOnlinePlayers(players);
@@ -349,17 +350,18 @@ function MainPage() {
                     {myNumbers.map((value) => (
                       <h1
                         key={value}
-                        className={`number-tile ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
+                        className={`number-tile ${revealedSet.has(value) ? 'is-revealed' : ''} ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
                         title={skippedNumbers.has(value) ? 'เลขนี้โดนข้ามไปแล้ว' : undefined}
                         role="heading"
                         aria-level={1}
                         tabIndex={0}
                         onClick={() => handleClickNumber(value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickNumber(value); } }}
-                        style={{ color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)` }}
+                        style={revealedSet.has(value) ? undefined : { color: numberColor(value) }}
                       >
                         {value}
                       </h1>
+                      
                     ))}
                   </div>
                   <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>

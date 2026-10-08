@@ -86,3 +86,13 @@ export const getNewlySkipped = (entries, revealedNumbers, number) => {
   const previousHighest = highestRevealed(revealedNumbers);
   return entries.map((e) => e.number).filter((n) => n > previousHighest && n < number && !revealed.has(n));
 };
+
+// สีตัวเลข 1 → 100: ฟ้า → เขียว → เหลือง → ส้ม → แดง
+// ใช้ OKLCH ที่ความสว่าง/ความสดคงที่ ทุก hue จึงสดและสว่างใกล้เคียงกัน (HSL ที่ L คงที่ ช่วงเหลือง/เขียว/ส้มจะหมอง)
+const COLOR_HUE_START = 235;
+const COLOR_HUE_END = 25;
+export const numberColor = (number, max = 100) => {
+  const ratio = Math.min(Math.max((number - 1) / (max - 1), 0), 1);
+  const hue = Math.round(COLOR_HUE_START + (COLOR_HUE_END - COLOR_HUE_START) * ratio);
+  return `oklch(0.78 0.35 ${hue})`;
+};
