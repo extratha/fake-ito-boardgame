@@ -89,8 +89,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -284,51 +284,124 @@
   transform: scale(0.85);
 }
 
+/* ติดขอบล่างจอจนกว่าจะ scroll ถึงตำแหน่งจริง แล้วอยู่ที่เดิมตามปกติ
+   ขนาดการ์ดต้องเท่าเดิมทุกสถานะ: ถ้าย่อตอนติดขอบ sentinel จะเลื่อนแล้วสลับสถานะวนจนกระพริบ */
+.heart-card {
+  position: sticky;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 4;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.heart-card .hearts {
+  gap: 4px;
+}
+
+.heart-card .heart {
+  width: 32px;
+  height: 32px;
+}
+
+.heart-card .button-row {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.heart-card .button-common {
+  padding: 8px 14px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+/* ตอนติดขอบเปลี่ยนแค่สิ่งที่ไม่กระทบ layout */
+.heart-card.is-stuck {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* sentinel สูง 0 และหักล้าง gap ของ .stack ไม่ให้เกิดช่องว่างเพิ่ม */
+.heart-sentinel {
+  height: 0;
+  margin-top: -16px;
+}
+
 /* ===== Reveal panel ===== */
 .reveal-panel {
-  position: fixed;
-  top: 96px; /* อยู่ใต้ header ไม่บังปุ่มย้อนกลับ/ป้าย host */
-  left: 8px;
+  position: fixed; /* top/left/right มาจาก inline style (ลากย้ายได้) */
   z-index: 5;
   display: flex;
   flex-direction: column;
-  width: 112px;
-  max-height: calc(100vh - 112px);
+  width: 144px; /* พอดี header (ไอคอนจับ + "เปิดแล้ว N" + ปุ่ม 40px) ทั้งตอนกางและพับ */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  transition: width 200ms var(--ease-out);
+  transition: top 200ms var(--ease-out);
 }
 
-.reveal-panel.is-collapsed {
-  width: auto;
+.reveal-panel.is-dragging {
+  transition: none;
+  opacity: 0.9;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
 }
 
 .reveal-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2px;
-  padding: 2px 2px 2px 10px;
+  gap: 4px;
+  padding: 2px 2px 2px 8px;
+  cursor: grab;
+  touch-action: none; /* ลากบนมือถือแล้วหน้าไม่ scroll ตาม */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.reveal-panel.is-dragging .reveal-panel-header {
+  cursor: grabbing;
+}
+
+.reveal-grip {
+  flex: none;
+  color: var(--color-muted);
+  opacity: 0.6;
 }
 
 .reveal-panel-title {
+  flex: 1;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-display);
   font-size: 14px;
   white-space: nowrap;
   color: var(--color-muted);
 }
 
+.reveal-toggle {
+  flex: none; /* ไม่ให้ปุ่มถูกบีบ ขนาดเท่ากันทุกสถานะ */
+}
+
 .reveal-toggle .chevron {
   transition: transform 200ms var(--ease-out);
 }
 
-.reveal-panel.is-collapsed .reveal-toggle .chevron {
+/* ลูกศรชี้ไปทางขอบจอตอนกาง (= พับเข้าขอบ) และชี้ออกตอนพับ */
+.reveal-panel.is-collapsed .reveal-toggle .chevron,
+.reveal-panel.is-right .reveal-toggle .chevron {
   transform: rotate(180deg);
+}
+
+.reveal-panel.is-right.is-collapsed .reveal-toggle .chevron {
+  transform: none;
 }
 
 .reveal-list {
@@ -671,4 +744,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ===== Notice ===== */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 6px 10px 14px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: var(--radius-md);
+  background: rgba(251, 191, 36, 0.1);
+  text-align: left;
+}
+
+.notice p {
+  flex: 1;
+  margin: 6px 0;
+  font-size: 15px;
+}
+
+.notice strong {
+  color: var(--color-primary);
+  letter-spacing: 0.05em;
 }
