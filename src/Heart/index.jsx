@@ -12,7 +12,7 @@ const HeartDisplay = ({ heart, onReduceHeart, onResetHeart }) => {
     if (!sentinel || typeof IntersectionObserver === 'undefined') return undefined;
     const observer = new IntersectionObserver(([entry]) => {
       // sentinel ยังอยู่ใต้จอ = ยังไม่ถึงตำแหน่งจริง = กำลังติดขอบล่าง
-      setIsStuck(!entry.isIntersecting && entry.boundingClientRect.top > 0);
+      setIsStuck(!entry.isIntersecting && entry.boundingClientRect.top > 0 );
     });
     observer.observe(sentinel);
     return () => observer.disconnect();

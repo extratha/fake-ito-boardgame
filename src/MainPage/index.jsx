@@ -11,11 +11,12 @@ import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
 import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
-import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers } from '../utils/roomData';
+import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, getNewlySkipped, numberColor } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
 import Chat from '../Chat';
+import MissTaunt, { createTauntEvent } from '../MissTaunt';
 
 import '../App.css'
 import NameModal from '../NameModal';
@@ -29,6 +30,7 @@ function MainPage() {
   const [userName, setUserName] = useState('');
   const [clientId] = useState(getClientId);
   const [numberEntries, setNumberEntries] = useState([]);
+  const [revealedNumbers, setRevealedNumbers] = useState([]);
   const [numbersPerPlayer, setNumbersPerPlayer] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [heart, setHeart] = useState(3);
@@ -46,6 +48,8 @@ function MainPage() {
   const { hostId, hostName, isHost } = useHost({ roomPath, clientId, userName, players });
 
   const myNumbers = useMemo(() => getMyNumbers(numberEntries, clientId), [numberEntries, clientId]);
+  const revealedSet = useMemo(() => new Set(revealedNumbers), [revealedNumbers]);
+  const skippedNumbers = useMemo(() => new Set(getSkippedNumbers(numberEntries, revealedNumbers)), [numberEntries, revealedNumbers]);
   const dealtOwners = useMemo(() => new Set(numberEntries.map(item => item.owner).filter(Boolean)), [numberEntries]);
   const onlinePlayers = getOnlinePlayers(players);
 
@@ -81,7 +85,7 @@ function MainPage() {
           numbers[number] = { owner: player.id, userName: player.name, createdAt: serverTimestamp() };
         });
       });
-      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null }), 'deal numbers');
+      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null, taunt: null }), 'deal numbers');
     } catch (error) {
       reportDbError(error, 'deal numbers');
     } finally {
@@ -131,7 +135,7 @@ function MainPage() {
   };
 
   const resetGameData = () =>
-    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null }), 'reset game');
+    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null, taunt: null }), 'reset game');
 
   const handleClickNumber = async (number) => {
     const revealNumbersRef = ref(db, `${roomPath}/revealNumbers`);
@@ -145,11 +149,21 @@ function MainPage() {
       }
 
       if (await showConfirm('เปิดเผยเลขของคุณให้สังคมรับรู้', { title: `เปิดเลข ${number}?`, confirmText: 'เปิดเลย' })) {
-        await withTimeout(set(push(revealNumbersRef), {
-          number,
-          userName,
-          createdAt: serverTimestamp(),
-        }), 'reveal number');
+        const revealedBefore = snapshotToList(snapshot).map((item) => item.number);
+        // ลงแล้วลงเลย: เก็บเลขที่เปิดไว้เสมอ แม้เปิดผิดลำดับ
+        await withTimeout(set(push(revealNumbersRef), { number, userName, createdAt: serverTimestamp() }), 'reveal number');
+        // เปิดแล้วข้ามเลขของคนอื่น = รอบนี้ failed: เขียน event ลง DB ให้ทุกคนเห็นข้อความแซวคำเดียวกัน
+        // เขียนครั้งเดียวต่อรอบ (ถ้ามีอยู่แล้วไม่ทับ) จนกว่าจะแจกเลขใหม่/รีเซ็ต แล้วค่อยแซวได้อีก
+        // แยกจากการบันทึกเลข: ข้อความแซวเขียนไม่สำเร็จก็ไม่กระทบเลขที่เปิดไปแล้ว
+        if (getNewlySkipped(numberEntries, revealedBefore, number).length > 0) {
+          const tauntRef = ref(db, `${roomPath}/taunt`);
+          try {
+            const existing = await withTimeout(get(tauntRef), 'check taunt');
+            if (!existing.exists()) await withTimeout(set(tauntRef, createTauntEvent()), 'write taunt');
+          } catch (error) {
+            reportDbError(error, 'write taunt');
+          }
+        }
       }
     } catch (error) {
       reportDbError(error, 'reveal number');
@@ -218,6 +232,13 @@ function MainPage() {
       setNumberEntries(toNumberEntries(snapshotToList(snapshot)));
     });
 
+    return () => unsubscribe();
+  }, [roomPath]);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(db, `${roomPath}/revealNumbers`), (snapshot) => {
+      setRevealedNumbers(snapshotToList(snapshot).map((item) => item.number));
+    });
     return () => unsubscribe();
   }, [roomPath]);
 
@@ -329,16 +350,18 @@ function MainPage() {
                     {myNumbers.map((value) => (
                       <h1
                         key={value}
-                        className="number-tile"
+                        className={`number-tile ${revealedSet.has(value) ? 'is-revealed' : ''} ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
+                        title={skippedNumbers.has(value) ? 'เลขนี้โดนข้ามไปแล้ว' : undefined}
                         role="heading"
                         aria-level={1}
                         tabIndex={0}
                         onClick={() => handleClickNumber(value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickNumber(value); } }}
-                        style={{ color: `hsl(${200 - ((value - 1) * 2)}, 100%, 40%)` }}
+                        style={revealedSet.has(value) ? undefined : { color: numberColor(value) }}
                       >
                         {value}
                       </h1>
+                      
                     ))}
                   </div>
                   <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>
@@ -346,10 +369,11 @@ function MainPage() {
               }
             </section>
 
-            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
             <HeartDisplay heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
             <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
             <RevealNumbers roomId={roomId} />
+            <MissTaunt roomPath={roomPath} />
           </div>
         }
         {

@@ -1,0 +1,95 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "rooms": {
+      // อ่านทั้ง rooms ได้เฉพาะเพื่อ cleanup ห้องเก่า (REST shallow=true ได้แค่ชื่อ key)
+      ".read": true,
+      "$roomId": {
+        ".read": true,
+        ".write": "$roomId.matches(/^[A-Za-z0-9]{3,40}$/)",
+        ".validate": "newData.hasChildren() || !newData.exists()",
+
+        "host": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
+        "hostId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "heart": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "settings": {
+          "numbersPerPlayer": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 3" },
+          "$other": { ".validate": false }
+        },
+
+        "topic": {
+          "$id": {
+            "topic": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "numbers": {
+          "$n": {
+            ".validate": "$n.matches(/^([1-9]|[1-9][0-9]|100)$/)",
+            "owner": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "revealNumbers": {
+          "$id": {
+            "number": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" },
+            "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "players": {
+          "$clientId": {
+            ".validate": "$clientId.length <= 64",
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
+            "online": { ".validate": "newData.isBoolean()" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "lastSeen": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "taunt": {
+          "id": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "index": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+
+        "chat": {
+          "$id": {
+            "clientId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    },
+
+    "roomIndex": {
+      ".read": true,
+      "$roomId": {
+        ".write": "$roomId.matches(/^[A-Za-z0-9]{3,40}$/)",
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "lastSeen": { ".validate": "newData.isNumber()" },
+        "hostName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "online": {
+          "$clientId": { ".validate": "$clientId.length <= 64 && newData.isString() && newData.val().length <= 40" }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

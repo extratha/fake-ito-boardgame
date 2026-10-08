@@ -1,7 +1,7 @@
 import { db } from "../firebase"; // Assuming your db is already initialized properly
 import { useEffect, useRef, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
-import { snapshotToList } from "../utils/roomData";
+import { snapshotToList, numberColor } from "../utils/roomData";
 
 export const PANEL_POSITION_KEY = 'revealPanelPosition';
 export const DEFAULT_PANEL_POSITION = { side: 'left', top: 96 }; // ใต้ header ไม่บังปุ่มย้อนกลับ/ป้าย host
@@ -30,7 +30,7 @@ export const snapSide = (left, width, viewportWidth) => (left + width / 2 < view
 
 const Chevron = () => (
   <svg className="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M15 18l-6-6 6-6" />
+    <path d="M6 15l6-6 6 6" />
   </svg>
 );
 
@@ -170,7 +170,7 @@ const RevealNumbers = ({ roomId }) => {
           {revealNumbers.map((revealedData) => (
             <div key={revealedData.id} className="reveal-item">
               <p>{revealedData.userName}</p>
-              <p className="reveal-number" style={{ color: `hsl(${200 - ((revealedData.number - 1) * 2)}, 100%, 40%)` }}>
+              <p className="reveal-number" style={{ color: numberColor(revealedData.number) }}>
                 {revealedData.number}
               </p>
             </div>

@@ -348,6 +348,81 @@ describe('reveal', () => {
   });
 });
 
+describe('เปิดเลขข้ามคนอื่น', () => {
+  const seedDealt = (extra = {}) => seedRoom({
+    numbers: {
+      10: { owner: 'other', createdAt: 1 },
+      20: { owner: ME, createdAt: 2 },
+      30: { owner: 'other2', createdAt: 3 },
+      40: { owner: ME, createdAt: 4 },
+    },
+    ...extra,
+  });
+
+  test('ไฮไลต์เลขของเราที่โดนข้าม', async () => {
+    seedDealt({ revealNumbers: { '-a': { number: 30, userName: 'Bob' } } });
+    await renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: '20' })).toHaveClass('is-skipped');
+    expect(screen.getByRole('heading', { level: 1, name: '40' })).not.toHaveClass('is-skipped');
+  });
+
+  test('เลขที่โดนข้ามแล้วถูกเปิดทีหลัง ยังไฮไลต์ค้างไว้จนกว่าจะแจกใหม่', async () => {
+    seedDealt({ revealNumbers: { '-a': { number: 30, userName: 'Bob' }, '-b': { number: 20, userName: 'Alice' } } });
+    await renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: '20' })).toHaveClass('is-skipped');
+  });
+
+  test('เปิดข้ามเลขคนอื่นแล้วเขียน taunt event ให้ทุกคนเห็น', async () => {
+    seedDealt();
+    await renderPage();
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '40' }));
+    await waitFor(() => expect(fakeDb.__getData(`${ROOM}/taunt`)).toEqual({
+      id: expect.any(String), index: expect.any(Number),
+    }));
+  });
+
+  test('failed แล้วเปิดเลขอื่นต่อไม่แซวซ้ำ จนกว่าจะแจกเลขใหม่', async () => {
+    seedDealt();
+    await renderPage();
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '40' })); // ข้าม 10, 30
+    await waitFor(() => expect(fakeDb.__getData(`${ROOM}/taunt`)).not.toBeNull());
+    const first = fakeDb.__getData(`${ROOM}/taunt`);
+
+    act(() => fakeDb.__write(`${ROOM}/numbers/50`, { owner: ME, createdAt: 5 }));
+    act(() => fakeDb.__write(`${ROOM}/numbers/45`, { owner: 'other', createdAt: 6 }));
+    userEvent.click(await screen.findByRole('heading', { level: 1, name: '50' })); // ข้าม 45 อีก
+    await waitFor(() => expect(Object.keys(fakeDb.__getData(`${ROOM}/revealNumbers`))).toHaveLength(2));
+    await act(async () => {});
+    expect(fakeDb.__getData(`${ROOM}/taunt`)).toEqual(first);
+
+    await click('แจกเลขใหม่ (1 คน)');
+    expect(fakeDb.__getData(`${ROOM}/taunt`)).toBeNull();
+  });
+
+  test('เปิดเรียงถูกลำดับไม่มี taunt', async () => {
+    seedDealt({ numbers: { 10: { owner: ME, createdAt: 1 }, 20: { owner: 'other', createdAt: 2 } } });
+    await renderPage();
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '10' }));
+    await waitFor(() => expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).not.toBeNull());
+    expect(fakeDb.__getData(`${ROOM}/taunt`)).toBeNull();
+  });
+});
+
+describe('เลขที่เปิดไปแล้ว', () => {
+  test('การ์ดที่เปิดแล้วเป็นสีเทา ที่ยังไม่เปิดคงสีเดิม', async () => {
+    seedRoom({
+      numbers: { 10: { owner: ME, createdAt: 1 }, 20: { owner: ME, createdAt: 2 } },
+      revealNumbers: { '-a': { number: 10, userName: 'Alice' } },
+    });
+    await renderPage();
+    const opened = screen.getByRole('heading', { level: 1, name: '10' });
+    const unopened = screen.getByRole('heading', { level: 1, name: '20' });
+    expect(opened).toHaveClass('is-revealed');
+    expect(opened.style.color).toBe('');
+    expect(unopened).not.toHaveClass('is-revealed');
+  });
+});
+
 describe('heart', () => {
   test('กดลดหัวใจพร้อมกันหลายครั้งแล้วลดครบ และรีหัวใจได้', async () => {
     await renderPage();

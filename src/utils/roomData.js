@@ -62,3 +62,37 @@ export const dealNumbers = (playerIds, perPlayer, maxNumber = 100, random = Math
     deck.slice(index * perPlayer, (index + 1) * perPlayer).sort((a, b) => a - b),
   ]));
 };
+
+const highestRevealed = (revealedNumbers) => revealedNumbers.reduce((max, n) => Math.max(max, n), 0);
+
+// revealedInOrder = เลขที่เปิดแล้วเรียงตามลำดับที่เปิด
+// เลขที่โดนข้าม: ยังไม่ถูกเปิดแต่มีคนเปิดเลขที่มากกว่าไปแล้ว หรือถูกเปิดทีหลังเลขที่มากกว่า (ลงแล้วลงเลย ค้างไว้จนกว่าจะแจกใหม่)
+export const getSkippedNumbers = (entries, revealedInOrder) => {
+  const skipped = new Set();
+  let highest = 0;
+  revealedInOrder.forEach((n) => {
+    if (n < highest) skipped.add(n);
+    else highest = n;
+  });
+  const revealed = new Set(revealedInOrder);
+  entries.forEach(({ number }) => { if (number < highest && !revealed.has(number)) skipped.add(number); });
+  return entries.map((e) => e.number).filter((n) => skipped.has(n));
+};
+
+// เลขที่เพิ่ง "โดนข้าม" จากการเปิด number นี้ (อยู่ระหว่างเลขสูงสุดที่เปิดมาก่อนหน้ากับ number)
+// การเปิดเลขที่ถูกข้ามอยู่แล้วทีหลัง หรือเปิดเลขที่เรียงถูกต้อง ไม่นับเป็นพลาดใหม่
+export const getNewlySkipped = (entries, revealedNumbers, number) => {
+  const revealed = new Set(revealedNumbers);
+  const previousHighest = highestRevealed(revealedNumbers);
+  return entries.map((e) => e.number).filter((n) => n > previousHighest && n < number && !revealed.has(n));
+};
+
+// สีตัวเลข 1 → 100: ฟ้า → เขียว → เหลือง → ส้ม → แดง
+// ใช้ OKLCH ที่ความสว่าง/ความสดคงที่ ทุก hue จึงสดและสว่างใกล้เคียงกัน (HSL ที่ L คงที่ ช่วงเหลือง/เขียว/ส้มจะหมอง)
+const COLOR_HUE_START = 235;
+const COLOR_HUE_END = 25;
+export const numberColor = (number, max = 100) => {
+  const ratio = Math.min(Math.max((number - 1) / (max - 1), 0), 1);
+  const hue = Math.round(COLOR_HUE_START + (COLOR_HUE_END - COLOR_HUE_START) * ratio);
+  return `oklch(0.78 0.35 ${hue})`;
+};
