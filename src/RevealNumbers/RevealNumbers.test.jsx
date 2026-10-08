@@ -1,6 +1,6 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import * as fakeDb from '../testUtils/fakeDatabase';
-import RevealNumbers, { DEFAULT_PANEL_POSITION, PANEL_POSITION_KEY, snapSide } from '.';
+import RevealNumbers, { DEFAULT_PANEL_POSITION, PANEL_POSITION_KEY, snapSide, DESKTOP_MEDIA_QUERY } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
 jest.mock('../firebase', () => ({ db: {} }));
@@ -118,4 +118,51 @@ test('snapSide ใช้จุดกลาง panel เทียบกับค�
   expect(snapSide(0, 100, 400)).toBe('left');
   expect(snapSide(149, 100, 400)).toBe('left');
   expect(snapSide(151, 100, 400)).toBe('right');
+});
+
+describe('โฟกัสช่องพิมพ์', () => {
+  beforeEach(() => {
+    fakeDb.__reset({ rooms: { room1: { revealNumbers: { '-k1': { number: 10, userName: 'Alice' } } } } });
+  });
+  const renderWithInput = () => render(<><input aria-label="chat" /><RevealNumbers roomId="room1" /></>);
+  const toggleButton = () => screen.getByRole('button', { name: /เลขที่เปิดแล้ว/ });
+
+  test('พับ panel ตอนโฟกัสช่องพิมพ์ แล้วกางกลับตอนเลิกโฟกัส', () => {
+    renderWithInput();
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
+
+    act(() => screen.getByLabelText('chat').focus());
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'false');
+
+    act(() => screen.getByLabelText('chat').blur());
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('จอ desktop ไม่พับ panel ตอนโฟกัสช่องพิมพ์', () => {
+    window.matchMedia = jest.fn((query) => ({ matches: query === DESKTOP_MEDIA_QUERY }));
+    try {
+      renderWithInput();
+      act(() => screen.getByLabelText('chat').focus());
+      expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      delete window.matchMedia;
+    }
+  });
+
+  test('panel ที่ผู้ใช้พับไว้เองอยู่แล้วไม่ถูกกางเองตอนเลิกโฟกัส', () => {
+    renderWithInput();
+    act(() => toggleButton().click());
+    act(() => screen.getByLabelText('chat').focus());
+    act(() => screen.getByLabelText('chat').blur());
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('กดกางเองระหว่างพิมพ์ แล้วเลิกโฟกัส panel ยังกางอยู่', () => {
+    renderWithInput();
+    act(() => screen.getByLabelText('chat').focus());
+    act(() => toggleButton().click());
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
+    act(() => screen.getByLabelText('chat').blur());
+    expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
+  });
 });
