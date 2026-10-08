@@ -409,14 +409,9 @@
   transition: transform 200ms var(--ease-out);
 }
 
-/* ลูกศรชี้ไปทางขอบจอตอนกาง (= พับเข้าขอบ) และชี้ออกตอนพับ */
-.reveal-panel.is-collapsed .reveal-toggle .chevron,
-.reveal-panel.is-right .reveal-toggle .chevron {
+/* รายการกางลงด้านล่าง: ตอนกางชี้ขึ้น (กดเพื่อพับ) ตอนพับชี้ลง (กดเพื่อกาง) */
+.reveal-panel.is-collapsed .reveal-toggle .chevron {
   transform: rotate(180deg);
-}
-
-.reveal-panel.is-right.is-collapsed .reveal-toggle .chevron {
-  transform: none;
 }
 
 .reveal-list {

@@ -152,11 +152,16 @@ function MainPage() {
         // ลงแล้วลงเลย: เก็บเลขที่เปิดไว้เสมอ แม้เปิดผิดลำดับ
         await withTimeout(set(push(revealNumbersRef), { number, userName, createdAt: serverTimestamp() }), 'reveal number');
         // เปิดแล้วข้ามเลขของคนอื่น = รอบนี้ failed: เขียน event ลง DB ให้ทุกคนเห็นข้อความแซวคำเดียวกัน
-        // เขียนได้ครั้งเดียวต่อรอบ (transaction ไม่ทับถ้ามีอยู่แล้ว) จนกว่าจะแจกเลขใหม่/รีเซ็ต แล้วค่อยแซวได้อีก
+        // เขียนครั้งเดียวต่อรอบ (ถ้ามีอยู่แล้วไม่ทับ) จนกว่าจะแจกเลขใหม่/รีเซ็ต แล้วค่อยแซวได้อีก
         // แยกจากการบันทึกเลข: ข้อความแซวเขียนไม่สำเร็จก็ไม่กระทบเลขที่เปิดไปแล้ว
         if (getNewlySkipped(numberEntries, revealedBefore, number).length > 0) {
-          runTransaction(ref(db, `${roomPath}/taunt`), (current) => (current ? undefined : createTauntEvent()))
-            .catch((error) => console.warn('[taunt]', error));
+          const tauntRef = ref(db, `${roomPath}/taunt`);
+          try {
+            const existing = await withTimeout(get(tauntRef), 'check taunt');
+            if (!existing.exists()) await withTimeout(set(tauntRef, createTauntEvent()), 'write taunt');
+          } catch (error) {
+            reportDbError(error, 'write taunt');
+          }
         }
       }
     } catch (error) {

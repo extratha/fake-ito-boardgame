@@ -1,15 +1,15 @@
 .miss-taunt {
   position: fixed;
   z-index: 60;
-  max-width: min(70vw, 280px);
+  white-space: nowrap;
   padding: 8px 14px;
   border-radius: 999px;
-  background: linear-gradient(to bottom, #ffffff, #f1f2f4);
+  background: linear-gradient(to bottom, #fdfdfd, #d8d8d8);
   color: #1f2937;
   font-size: 14px;
   font-weight: 600;
   text-align: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 4px 0px rgba(0, 0, 0, 0.32);
   pointer-events: none;
   animation: miss-taunt 4s ease both;
 }
