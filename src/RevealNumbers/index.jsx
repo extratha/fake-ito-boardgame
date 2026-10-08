@@ -42,6 +42,12 @@ const GripIcon = () => (
   </svg>
 );
 
+// จอกว้าง (desktop) panel อยู่ข้างเนื้อหา ไม่บังช่องพิมพ์ ไม่ต้องพับเอง
+export const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
+const isDesktop = () => typeof window.matchMedia === 'function' && window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+
+const isEditable = (el) => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+
 const RevealNumbers = ({ roomId }) => {
 
   const [revealNumbers, setRevealNumbers] = useState([]);
@@ -53,6 +59,8 @@ const RevealNumbers = ({ roomId }) => {
   const panelRef = useRef(null);
   const dragRef = useRef(null);
   const suppressClickRef = useRef(false);
+  const expandedRef = useRef(true);
+  const autoCollapsedRef = useRef(false);
 
   useEffect(() => {
     const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
@@ -64,6 +72,30 @@ const RevealNumbers = ({ roomId }) => {
 
     return () => unsubscribe();
   }, [roomId]);
+
+  useEffect(() => { expandedRef.current = isExpanded; }, [isExpanded]);
+
+  // ตอนโฟกัสช่องพิมพ์ (เช่น แชท) บนจอเล็ก พับ panel ไม่ให้บังช่องพิมพ์ แล้วกางกลับเมื่อพิมพ์เสร็จ
+  useEffect(() => {
+    const handleFocusIn = (event) => {
+      if (!isEditable(event.target) || !expandedRef.current || isDesktop()) return;
+      autoCollapsedRef.current = true;
+      expandedRef.current = false;
+      setIsExpanded(false);
+    };
+    const handleFocusOut = (event) => {
+      if (!isEditable(event.target) || !autoCollapsedRef.current) return;
+      autoCollapsedRef.current = false;
+      expandedRef.current = true;
+      setIsExpanded(true);
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   // หมุนจอ/ย่อหน้าต่าง: คำนวณ top ที่ clamp ใหม่
   useEffect(() => {
@@ -126,6 +158,7 @@ const RevealNumbers = ({ roomId }) => {
       suppressClickRef.current = false;
       return;
     }
+    autoCollapsedRef.current = false; // ผู้ใช้กดเอง = ไม่ต้องกางกลับให้อัตโนมัติ
     setIsExpanded((prev) => !prev);
   };
 

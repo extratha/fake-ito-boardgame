@@ -16,6 +16,7 @@ import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
 import Chat from '../Chat';
+import TopicNotice from '../TopicNotice';
 import MissTaunt, { createTauntEvent } from '../MissTaunt';
 
 import '../App.css'
@@ -374,6 +375,7 @@ function MainPage() {
             <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
             <RevealNumbers roomId={roomId} />
             <MissTaunt roomPath={roomPath} />
+            <TopicNotice roomPath={roomPath} silent={isHost} />
           </div>
         }
         {
