@@ -1,4 +1,4 @@
-import { getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, range, getSkippedNumbers, numberColor } from './roomData';
+import { getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, range, getSkippedNumbers, isRoundWon, numberColor } from './roomData';
 
 const snapshotOf = (value) => ({
   exists: () => value != null,
@@ -78,4 +78,13 @@ describe('เลขที่โดนข้าม', () => {
     expect(getSkippedNumbers(entries, [40, 20])).toEqual([10, 20, 30]); // 20 ถูกเปิดทีหลัง ยังถือว่าโดนข้าม
     expect(getSkippedNumbers(entries, [10, 20, 40])).toEqual([30]);
   });
+});
+
+test('isRoundWon: เปิดครบทุกใบที่แจกและเรียงจากน้อยไปมากเท่านั้น', () => {
+  const dealt = { a: 2, b: 1 };
+  expect(isRoundWon(dealt, [10, 20, 30])).toBe(true);
+  expect(isRoundWon(dealt, [10, 20])).toBe(false); // ยังเปิดไม่ครบ
+  expect(isRoundWon(dealt, [10, 30, 20])).toBe(false); // มีใบโดนข้าม
+  expect(isRoundWon({}, [])).toBe(false); // ยังไม่ได้แจก
+  expect(isRoundWon(null, [5])).toBe(false);
 });

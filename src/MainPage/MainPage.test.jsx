@@ -433,6 +433,29 @@ describe('เปิดเลขข้ามคนอื่น', () => {
   });
 });
 
+describe('ชนะรอบ', () => {
+  const hasRainbow = () => document.querySelector('.win-border') !== null;
+
+  test('ทุกคนเปิดครบและเรียงถูก: แสดงขอบรุ้งและป้ายผ่านหมด แจกใหม่แล้วหายไป', async () => {
+    seedRoom({ revealNumbers: { 10: reveal('other', 'Bob', 1) } }, { other: [10], [ME]: [20] });
+    await renderPage();
+    expect(hasRainbow()).toBe(false);
+
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '20' }));
+    await waitFor(() => expect(hasRainbow()).toBe(true));
+    expect(screen.getByText('ผ่านหมด!')).toBeInTheDocument();
+
+    await click('แจกเลขใหม่ (1 คน)');
+    expect(hasRainbow()).toBe(false);
+  });
+
+  test('เปิดครบแต่มีใบโดนข้าม: ไม่ฉลอง', async () => {
+    seedRoom({ revealNumbers: { 20: reveal(ME, 'Alice', 1), 10: reveal('other', 'Bob', 2) } }, { other: [10], [ME]: [20] });
+    await renderPage();
+    expect(hasRainbow()).toBe(false);
+  });
+});
+
 describe('เลขที่เปิดไปแล้ว', () => {
   test('การ์ดที่เปิดแล้วเป็นสีเทา ที่ยังไม่เปิดคงสีเดิม', async () => {
     seedRoom({ revealNumbers: { 10: reveal(ME, 'Alice', 1) } }, { [ME]: [10, 20] });

@@ -11,13 +11,14 @@ import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
 import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
-import { snapshotToList, getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, numberColor } from '../utils/roomData';
+import { snapshotToList, getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, isRoundWon, numberColor } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
 import Chat from '../Chat';
 import TopicNotice from '../TopicNotice';
 import MissTaunt, { createTauntEvent } from '../MissTaunt';
+import WinCelebration from '../WinCelebration';
 
 import '../App.css'
 import NameModal from '../NameModal';
@@ -56,6 +57,7 @@ function MainPage() {
   // ใครได้เลขรอบนี้บ้าง (สาธารณะ แค่จำนวน ไม่บอกเลข)
   const dealtOwners = useMemo(() => new Set(Object.keys(dealtCounts)), [dealtCounts]);
   const hasRound = dealtOwners.size > 0;
+  const isWon = useMemo(() => isRoundWon(dealtCounts, revealedNumbers), [dealtCounts, revealedNumbers]);
   const onlinePlayers = getOnlinePlayers(players);
 
   const fetchUsedTopics = async () => {
@@ -405,6 +407,7 @@ function MainPage() {
 
             <RevealNumbers roomId={roomId} />
             <MissTaunt roomPath={roomPath} />
+            <WinCelebration active={isWon} />
             <TopicNotice roomPath={roomPath} silent={isHost} />
         </div>
         {

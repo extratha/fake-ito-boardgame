@@ -1,0 +1,88 @@
+/* มุมของ gradient ต้องประกาศเป็น <angle> ถึงจะ animate ได้ (หมุนสีรุ้งรอบขอบจอ) */
+@property --win-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ขอบจอสีรุ้ง: gradient เต็มจอแล้ว mask เหลือแค่ขอบ (padding = ความหนา) ไม่บังการกด */
+.win-border {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  padding: 4px;
+  border-radius: 4px;
+  pointer-events: none;
+  background: conic-gradient(from var(--win-angle), #ef4444, #f59e0b, #facc15, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: win-spin 3s linear infinite, win-fade-in 600ms ease-out both;
+}
+
+@keyframes win-spin {
+  to { --win-angle: 360deg; }
+}
+
+@keyframes win-fade-in {
+  from { opacity: 0; }
+}
+
+.win-banner {
+  position: fixed;
+  top: calc(24px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 61;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px 12px 18px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--color-card-raised), var(--color-card));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(250, 204, 21, 0.15);
+  text-align: left;
+  animation: win-banner-pop 450ms var(--ease-out) both;
+}
+
+.win-banner strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--color-primary);
+}
+
+.win-banner p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.win-banner-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.win-banner-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+@keyframes win-banner-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.9); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win-border { animation: win-fade-in 600ms ease-out both; }
+  .win-banner { animation: none; }
+}

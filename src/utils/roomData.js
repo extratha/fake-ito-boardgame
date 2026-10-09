@@ -77,6 +77,14 @@ export const getSkippedNumbers = (entries, revealedInOrder) => {
   return entries.map((e) => e.number).filter((n) => skipped.has(n));
 };
 
+// ชนะรอบนี้: เปิดครบทุกใบที่แจก และเปิดเรียงจากน้อยไปมากโดยไม่มีใบไหนโดนข้าม
+// ใช้แค่ข้อมูลสาธารณะ (จำนวนที่แจกให้แต่ละคน + ลำดับที่เปิด) ทุกเครื่องจึงเห็นผลตรงกัน
+export const isRoundWon = (dealtCounts, revealedInOrder) => {
+  const total = Object.values(dealtCounts || {}).reduce((sum, count) => sum + count, 0);
+  if (total === 0 || revealedInOrder.length < total) return false;
+  return revealedInOrder.every((n, i) => i === 0 || n > revealedInOrder[i - 1]);
+};
+
 // สีตัวเลข 1 → 100: ฟ้า → เขียว → เหลือง → ส้ม → แดง
 // ใช้ OKLCH ที่ความสว่าง/ความสดคงที่ ทุก hue จึงสดและสว่างใกล้เคียงกัน (HSL ที่ L คงที่ ช่วงเหลือง/เขียว/ส้มจะหมอง)
 const COLOR_HUE_START = 235;
