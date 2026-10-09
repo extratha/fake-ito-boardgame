@@ -22,7 +22,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "npm run build && firebase deploy"
+    "deploy": "npm run build && firebase deploy",
+    "test:rules": "firebase emulators:exec --only database --project demo-ito \"jest --config rules-tests/jest.config.js\""
   },
   "eslintConfig": {
     "extends": [
@@ -47,5 +48,8 @@
       "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js",
       "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js"
     }
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1"
   }
 }

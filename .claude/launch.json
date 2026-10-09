@@ -4,9 +4,29 @@
     {
       "name": "dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["react-scripts", "start"],
-      "env": { "PORT": "3005", "BROWSER": "none" },
+      "runtimeArgs": [
+        "react-scripts",
+        "start"
+      ],
+      "env": {
+        "PORT": "3005",
+        "BROWSER": "none"
+      },
       "port": 3005
+    },
+    {
+      "name": "dev-emulators",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "react-scripts",
+        "start"
+      ],
+      "env": {
+        "PORT": "3006",
+        "BROWSER": "none",
+        "REACT_APP_FIREBASE_EMULATORS": "true"
+      },
+      "port": 3006
     }
   ]
 }

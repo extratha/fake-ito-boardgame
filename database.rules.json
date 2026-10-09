@@ -1,55 +1,71 @@
 {
   "rules": {
+    // ทุกคน sign-in แบบ anonymous ก่อนใช้งาน: auth.uid = id ของผู้เล่น (players/$uid, hostId, owner, clientId)
+    // host = rooms/$roomId/hostId, สมาชิก = มี rooms/$roomId/players/{auth.uid}
     ".read": false,
     ".write": false,
-
     "rooms": {
-      // อ่านทั้ง rooms ได้เฉพาะเพื่อ cleanup ห้องเก่า (REST shallow=true ได้แค่ชื่อ key)
-      ".read": true,
       "$roomId": {
-        ".read": true,
-        ".write": "$roomId.matches(/^[A-Za-z0-9]{3,40}$/)",
+        // รู้รหัสห้อง = เข้าห้องได้ (ไม่มีการอ่าน rooms ทั้งก้อน)
+        ".read": "auth != null",
+        // ทั้งห้อง: สร้างได้ถ้าตั้งตัวเองเป็น host / ลบได้โดย host หรือเมื่อหมดอายุ (ตรงกับ utils/roomCleanup.js)
+        ".write": "auth != null && $roomId.matches(/^[A-Za-z0-9]{3,40}$/) && ((!data.exists() && newData.child('hostId').val() === auth.uid) || (data.exists() && !newData.exists() && (data.child('hostId').val() === auth.uid || data.child('createdAt').val() < now - 86400000 || (root.child('roomIndex').child($roomId).child('lastSeen').val() < now - 600000 && !root.child('roomIndex').child($roomId).child('online').exists()))))",
         ".validate": "newData.hasChildren() || !newData.exists()",
-
-        "host": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
-        "hostId": { ".validate": "newData.isString() && newData.val().length <= 64" },
-        "heart": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+        "host": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+        },
+        // รับ host ได้เฉพาะตั้งเป็นตัวเอง และเฉพาะตอนห้องยังไม่มี host หรือ host เดิมออฟไลน์ (hooks/useHost.js)
+        "hostId": {
+          ".write": "auth != null && newData.val() === auth.uid && root.child('rooms').child($roomId).child('host').exists() && (!data.exists() || root.child('rooms').child($roomId).child('players').child(data.val()).child('online').val() !== true)",
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+        // หัวใจ: ผู้เล่นทุกคนในห้องกดลด/รีได้
+        "heart": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('players').child(auth.uid).exists()",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3"
+        },
         "createdAt": { ".validate": "newData.isNumber()" },
         "settings": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
           "numbersPerPlayer": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 3" },
           "$other": { ".validate": false }
         },
-
         "topic": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
           "$id": {
             "topic": { ".validate": "newData.isString() && newData.val().length <= 200" },
             "createdAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }
         },
-
+        // ใครได้เลขรอบนี้กี่เลข (สาธารณะ ไม่บอกว่าเลขอะไร) host เขียนตอนแจก/ล้างรอบ
+        "dealt": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
+          "$uid": { ".validate": "$uid.length <= 128 && newData.isNumber() && newData.val() >= 1 && newData.val() <= 3" }
+        },
+        // รูปแบบเก่า (เลขทุกคนอยู่ในห้อง อ่านได้ทุกคน): host ลบได้อย่างเดียว ห้ามเขียนใหม่
         "numbers": {
-          "$n": {
-            ".validate": "$n.matches(/^([1-9]|[1-9][0-9]|100)$/)",
-            "owner": { ".validate": "newData.isString() && newData.val().length <= 64" },
-            "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
-            "createdAt": { ".validate": "newData.isNumber()" },
-            "$other": { ".validate": false }
-          }
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
+          ".validate": false
         },
-
+        // key = เลขที่เปิด: host ล้างทั้งก้อน / ผู้เล่นเปิดได้เฉพาะเลขที่อยู่ในมือตัวเอง ครั้งเดียว (แก้/ลบไม่ได้)
         "revealNumbers": {
-          "$id": {
-            "number": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100" },
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
+          "$n": {
+            ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && root.child('hands').child($roomId).child(auth.uid).child($n).val() === true",
+            ".validate": "$n.matches(/^([1-9]|[1-9][0-9]|100)$/) && newData.hasChildren(['uid', 'createdAt'])",
             "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "uid": { ".validate": "newData.isString()" },
             "createdAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }
         },
-
+        // presence: เขียนได้เฉพาะของตัวเอง และเฉพาะห้องที่ยังมีอยู่ (กันห้องผีจากการเขียนหลังห้องถูกลบ)
         "players": {
           "$clientId": {
-            ".validate": "$clientId.length <= 64",
+            ".write": "auth != null && auth.uid === $clientId && root.child('rooms').child($roomId).child('host').exists()",
+            ".validate": "$clientId.length <= 128",
             "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
             "online": { ".validate": "newData.isBoolean()" },
             "joinedAt": { ".validate": "newData.isNumber()" },
@@ -57,36 +73,58 @@
             "$other": { ".validate": false }
           }
         },
-
         "taunt": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('players').child(auth.uid).exists()",
           "id": { ".validate": "newData.isString() && newData.val().length <= 40" },
           "index": { ".validate": "newData.isNumber()" },
           "$other": { ".validate": false }
         },
-
+        // แชท: ส่งในนามตัวเองเท่านั้น ลบข้อความเก่าได้ (ตัดให้เหลือ 100 ข้อความ) แต่แก้ข้อความไม่ได้
         "chat": {
           "$id": {
-            "clientId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            ".write": "auth != null && root.child('rooms').child($roomId).child('players').child(auth.uid).exists() && (!newData.exists() || (!data.exists() && newData.child('clientId').val() === auth.uid))",
+            "clientId": { ".validate": "newData.isString() && newData.val().length <= 128" },
             "userName": { ".validate": "newData.isString() && newData.val().length <= 40" },
             "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200" },
             "createdAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }
         },
-
         "$other": { ".validate": false }
       }
     },
-
-    "roomIndex": {
-      ".read": true,
+    // เลขในมือ: อ่านได้เฉพาะเจ้าของ (ไม่อยู่ใต้ rooms เพราะ rooms/$roomId อ่านได้ทุกคนในห้อง และสิทธิ์อ่านไหลลงลูกทั้งหมด)
+    // host เขียนตอนแจก/ล้างรอบ (host จึงยังเห็นเลขทุกคน) / ลบพร้อมห้องตอน cleanup
+    "hands": {
       "$roomId": {
-        ".write": "$roomId.matches(/^[A-Za-z0-9]{3,40}$/)",
+        ".write": "auth != null && (root.child('rooms').child($roomId).child('hostId').val() === auth.uid || (!newData.exists() && !newData.parent().parent().child('rooms').child($roomId).exists()))",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".validate": "$uid.length <= 128",
+          "$n": { ".validate": "$n.matches(/^([1-9]|[1-9][0-9]|100)$/) && newData.val() === true" }
+        }
+      }
+    },
+    "roomIndex": {
+      ".read": "auth != null",
+      "$roomId": {
+        // สร้างพร้อมห้อง (คำสั่งเดียวกัน) / ลบเมื่อห้องหายไปแล้ว ลบโดย host หรือหมดอายุ
+        ".write": "auth != null && $roomId.matches(/^[A-Za-z0-9]{3,40}$/) && ((!data.exists() && newData.parent().parent().child('rooms').child($roomId).child('hostId').val() === auth.uid) || (data.exists() && !newData.exists() && (!root.child('rooms').child($roomId).exists() || root.child('rooms').child($roomId).child('hostId').val() === auth.uid || data.child('createdAt').val() < now - 86400000 || (data.child('lastSeen').val() < now - 600000 && !data.child('online').exists()))))",
         "createdAt": { ".validate": "newData.isNumber()" },
-        "lastSeen": { ".validate": "newData.isNumber()" },
-        "hostName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        // presence ตั้ง onDisconnect ก่อนลงชื่อในห้อง จึงไม่บังคับว่าต้องเป็นสมาชิก แค่ห้องต้องมีอยู่
+        "lastSeen": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('host').exists()",
+          ".validate": "newData.isNumber()"
+        },
+        "hostName": {
+          ".write": "auth != null && root.child('rooms').child($roomId).child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
         "online": {
-          "$clientId": { ".validate": "$clientId.length <= 64 && newData.isString() && newData.val().length <= 40" }
+          "$clientId": {
+            ".write": "auth != null && auth.uid === $clientId && (!newData.exists() || root.child('rooms').child($roomId).child('host').exists())",
+            ".validate": "$clientId.length <= 128 && newData.isString() && newData.val().length <= 40"
+          }
         },
         "$other": { ".validate": false }
       }

@@ -7,7 +7,7 @@ import { showAlert } from '../Dialog/dialogStore';
 import WelcomePage, { ROOM_ID_CHARS, generateRoomId, normalizeRoomId } from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
-jest.mock('../firebase', () => ({ db: {} }));
+jest.mock('../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'client-alice' } } }));
 jest.mock('../Dialog/dialogStore', () => ({ showAlert: jest.fn() }));
 const mockNavigate = jest.fn();
 let mockLocation = { pathname: '/', state: null };
@@ -18,7 +18,6 @@ beforeEach(() => {
   mockNavigate.mockReset();
   mockLocation = { pathname: '/', state: null };
   Cookies.set('userName', 'Alice');
-  Cookies.set('clientId', 'client-alice');
   showAlert.mockReset();
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -27,7 +26,6 @@ afterEach(() => {
   jest.useRealTimers();
   jest.restoreAllMocks();
   Cookies.remove('userName');
-  Cookies.remove('clientId');
 });
 
 test('สร้างห้องสำเร็จแล้วไปหน้าห้อง', async () => {

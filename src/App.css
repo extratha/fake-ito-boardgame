@@ -16,6 +16,109 @@
   gap: 16px;
 }
 
+/* ===== Room layout =====
+   มือถือ: room-layout/room-main/room-side เป็น display: contents ให้การ์ดเป็นลูกของ .stack ตรง ๆ
+   (การ์ดหัวใจจึงยัง sticky ได้ทั้งหน้า) และใช้ order ดันการ์ดผู้เล่นไปไว้หลังแชทเหมือนเดิม */
+.room-layout,
+.room-main,
+.room-side {
+  display: contents;
+}
+
+.player-card {
+  order: 1;
+}
+
+/* desktop: หน้าห้องสูงพอดีจอ header อยู่บน
+   ซ้าย = หัวข้อ/การ์ด/หัวใจ + ผู้เล่นเต็มพื้นที่ที่เหลือ (scroll ในคอลัมน์เองถ้ายาวเกิน), ขวา = แชทเต็มความสูง */
+@media (min-width: 1024px) {
+  .wrapper:has(.room-layout) {
+    display: flex;
+    flex-direction: column;
+    max-width: 1120px;
+    height: 100vh;
+    min-height: 560px;
+    padding-bottom: 16px;
+  }
+
+  .wrapper:has(.room-layout)>.stack {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .room-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .room-main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* การ์ดเลขของคุณ: สูงอย่างน้อย 40vh ช่องตัวเลขใหญ่ขึ้นและอยู่กลางพื้นที่ที่เหลือ */
+  .numbers-card {
+    flex: none;
+    min-height: 40vh;
+  }
+
+  .numbers-card .number-tiles {
+    flex: 1;
+    align-items: center;
+    align-content: center;
+    gap: 24px;
+  }
+
+  .numbers-card .number-tile {
+    min-width: 132px;
+    padding: 16px 20px;
+    border-radius: var(--radius-lg);
+    font-size: 64px;
+    line-height: 1.1;
+    box-shadow: 0 7px 0 #111, 0 14px 26px rgba(0, 0, 0, 0.5);
+  }
+
+  .numbers-card .number-tile:active {
+    transform: translateY(7px);
+    box-shadow: 0 0 0 #111, 0 2px 6px rgba(0, 0, 0, 0.45);
+  }
+
+  .room-main .player-card {
+    flex: 1;
+    min-height: 160px;
+  }
+
+  .room-main .player-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .room-side {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .room-side .chat {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .room-side .chat-list {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+}
+
 /* ===== Buttons: ปุ่มนูนแบบเกม กดแล้วยุบลง ===== */
 .button-common {
   --btn-bg: var(--color-neutral);
@@ -126,7 +229,8 @@
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-fg);
-  font-size: 16px; /* >=16px กัน iOS zoom */
+  font-size: 16px;
+  /* >=16px กัน iOS zoom */
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
@@ -265,11 +369,28 @@
 }
 
 @keyframes tile-skipped {
-  0%, 100% { filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5)); rotate: 0deg; }
-  15% { rotate: -2deg; }
-  30% { rotate: 2deg; }
-  45% { rotate: 0deg; }
-  50% { filter: drop-shadow(0 0 16px rgba(239, 68, 68, 1)); }
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5));
+    rotate: 0deg;
+  }
+
+  15% {
+    rotate: -2deg;
+  }
+
+  30% {
+    rotate: 2deg;
+  }
+
+  45% {
+    rotate: 0deg;
+  }
+
+  50% {
+    filter: drop-shadow(0 0 16px rgba(239, 68, 68, 1));
+  }
 }
 
 @keyframes tile-pop {
@@ -277,6 +398,7 @@
     transform: scale(0.6) rotate(-6deg);
     opacity: 0;
   }
+
   to {
     transform: scale(1) rotate(0);
     opacity: 1;
@@ -308,7 +430,7 @@
 .heart-card {
   position: sticky;
   /* bottom: calc(8px + env(safe-area-inset-bottom)); */
-  top:calc(10px + env(safe-area-inset-top));
+  top: calc(10px + env(safe-area-inset-top));
   z-index: 4;
   flex-direction: row;
   flex-wrap: wrap;
@@ -352,11 +474,13 @@
 
 /* ===== Reveal panel ===== */
 .reveal-panel {
-  position: fixed; /* top/left/right มาจาก inline style (ลากย้ายได้) */
+  position: fixed;
+  /* top/left/right มาจาก inline style (ลากย้ายได้) */
   z-index: 5;
   display: flex;
   flex-direction: column;
-  width: 144px; /* พอดี header (ไอคอนจับ + "เปิดแล้ว N" + ปุ่ม 40px) ทั้งตอนกางและพับ */
+  width: 144px;
+  /* พอดี header (ไอคอนจับ + "เปิดแล้ว N" + ปุ่ม 40px) ทั้งตอนกางและพับ */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: rgba(15, 23, 42, 0.92);
@@ -379,7 +503,8 @@
   gap: 4px;
   padding: 2px 2px 2px 8px;
   cursor: grab;
-  touch-action: none; /* ลากบนมือถือแล้วหน้าไม่ scroll ตาม */
+  touch-action: none;
+  /* ลากบนมือถือแล้วหน้าไม่ scroll ตาม */
   user-select: none;
   -webkit-user-select: none;
 }
@@ -407,7 +532,8 @@
 }
 
 .reveal-toggle {
-  flex: none; /* ไม่ให้ปุ่มถูกบีบ ขนาดเท่ากันทุกสถานะ */
+  flex: none;
+  /* ไม่ให้ปุ่มถูกบีบ ขนาดเท่ากันทุกสถานะ */
 }
 
 .reveal-toggle .chevron {
@@ -460,9 +586,34 @@
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
+/* แจ้งว่ากำลังรอ DB โดยไม่ซ่อนเนื้อหา (ไม่บังการกด) */
+.loading-toast {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 20;
+  margin: 0;
+  padding: 6px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  color: var(--color-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  pointer-events: none;
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
 @keyframes pulse {
-  from { opacity: 0.4; }
-  to { opacity: 1; }
+  from {
+    opacity: 0.4;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* ===== Welcome ===== */
@@ -506,8 +657,13 @@
   animation: tile-pop 320ms var(--ease-out) both;
 }
 
-.welcome-dice span:nth-child(1) { rotate: -8deg; }
-.welcome-dice span:nth-child(3) { rotate: 8deg; }
+.welcome-dice span:nth-child(1) {
+  rotate: -8deg;
+}
+
+.welcome-dice span:nth-child(3) {
+  rotate: 8deg;
+}
 
 .divider {
   margin: 0;
@@ -665,7 +821,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  height: 240px;
+  height: 400px;
   padding: 10px;
   overflow-y: auto;
   border-radius: var(--radius-md);

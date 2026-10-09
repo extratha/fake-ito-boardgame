@@ -4,12 +4,25 @@ const CrownIcon = () => (
   </svg>
 );
 
-const PlayerList = ({ players, hostId, clientId, dealtOwners }) => {
+// คนเดิมที่ได้ id ใหม่ (ล้างข้อมูล browser / เปลี่ยนเครื่อง) จะเหลือรายการเก่าค้างเป็นออฟไลน์
+// ซ่อนรายการออฟไลน์ที่ชื่อซ้ำกับคนที่ออนไลน์อยู่ หรือซ้ำกับรายการออฟไลน์ที่แสดงไปแล้ว
+export const visiblePlayers = (players) => {
   const sorted = [...players].sort((a, b) =>
     (b.online === true) - (a.online === true) || (a.joinedAt ?? Infinity) - (b.joinedAt ?? Infinity));
+  const shownNames = new Set(sorted.filter((p) => p.online === true).map((p) => p.name));
+  return sorted.filter((player) => {
+    if (player.online === true) return true;
+    if (shownNames.has(player.name)) return false;
+    shownNames.add(player.name);
+    return true;
+  });
+};
+
+const PlayerList = ({ players, hostId, clientId, dealtOwners }) => {
+  const sorted = visiblePlayers(players);
 
   return (
-    <section className="card">
+    <section className="card player-card">
       <h2 className="card-title">ผู้เล่น {players.filter((p) => p.online).length} คน</h2>
       <ul className="player-list">
         {sorted.map((player) => (

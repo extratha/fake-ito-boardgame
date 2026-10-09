@@ -1,26 +1,29 @@
-import { getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, range, getSkippedNumbers, getNewlySkipped, numberColor } from './roomData';
+import { getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, range, getSkippedNumbers, numberColor } from './roomData';
+
+const snapshotOf = (value) => ({
+  exists: () => value != null,
+  forEach: (cb) => Object.keys(value).forEach((key) => cb({ key, val: () => value[key] })),
+});
 
 test('getLatestTopic คืนตัวสุดท้าย หรือ string ว่าง', () => {
   expect(getLatestTopic([{ topic: 'a' }, { topic: 'b' }])).toBe('b');
   expect(getLatestTopic([])).toBe('');
 });
 
-test('toNumberEntries รองรับทั้งรูปแบบใหม่ (key=เลข) และรูปแบบเก่า (push id)', () => {
-  expect(toNumberEntries([
-    { id: '7', owner: 'x' },
-    { id: '-abc', number: 9 },
-    { id: '-bad' },
-  ]).map((e) => e.number)).toEqual([7, 9]);
+test('handToNumbers แปลงเลขในมือเป็น array เรียงจากน้อยไปมาก', () => {
+  expect(handToNumbers({ 70: true, 5: true, 42: true })).toEqual([5, 42, 70]);
+  expect(handToNumbers(null)).toEqual([]);
 });
 
-test('getMyNumbers กรองตาม owner และเรียงตามเวลาที่สุ่ม', () => {
-  const entries = [
-    { number: 5, owner: 'me', createdAt: 3 },
-    { number: 1, owner: 'you', createdAt: 1 },
-    { number: 9, owner: 'me', createdAt: 2 },
-  ];
-  expect(getMyNumbers(entries, 'me')).toEqual([9, 5]);
-  expect(getMyNumbers(entries, undefined)).toEqual([]);
+test('toRevealList เรียงตามลำดับที่เปิด (createdAt) และรองรับข้อมูลเก่าแบบ push id', () => {
+  const list = toRevealList(snapshotOf({
+    40: { uid: 'a', createdAt: 30 },
+    10: { uid: 'b', createdAt: 20 },
+    '-old': { number: 7, createdAt: 10 },
+    '-bad': { createdAt: 5 },
+  }));
+  expect(list.map((item) => item.number)).toEqual([7, 10, 40]);
+  expect(toRevealList(snapshotOf(null))).toEqual([]);
 });
 
 test('pickRandomUnused ไม่คืนตัวที่ใช้แล้ว และคืน null เมื่อหมด แม้ used มีตัวที่ไม่อยู่ใน pool', () => {
@@ -74,14 +77,5 @@ describe('เลขที่โดนข้าม', () => {
     expect(getSkippedNumbers(entries, [40])).toEqual([10, 20, 30]);
     expect(getSkippedNumbers(entries, [40, 20])).toEqual([10, 20, 30]); // 20 ถูกเปิดทีหลัง ยังถือว่าโดนข้าม
     expect(getSkippedNumbers(entries, [10, 20, 40])).toEqual([30]);
-  });
-
-  test('getNewlySkipped: นับเฉพาะเลขที่เพิ่งโดนข้ามจากการเปิดครั้งนี้', () => {
-    expect(getNewlySkipped(entries, [], 10)).toEqual([]);
-    expect(getNewlySkipped(entries, [10], 30)).toEqual([20]);
-    expect(getNewlySkipped(entries, [], 30)).toEqual([10, 20]);
-    // เปิดเลขที่ถูกข้ามอยู่แล้วทีหลัง / เปิดเรียงถูก ไม่ใช่พลาดใหม่
-    expect(getNewlySkipped(entries, [40], 10)).toEqual([]);
-    expect(getNewlySkipped(entries, [10], 20)).toEqual([]);
   });
 });

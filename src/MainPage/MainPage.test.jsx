@@ -8,7 +8,7 @@ import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import MainPage from '.';
 
 jest.mock('firebase/database', () => require('../testUtils/fakeDatabase'));
-jest.mock('../firebase', () => ({ db: {} }));
+jest.mock('../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'client-me' } } }));
 jest.mock('../Dialog/dialogStore', () => ({ showAlert: jest.fn(), showConfirm: jest.fn() }));
 const mockNavigate = jest.fn();
 jest.mock('react-router', () => ({
@@ -19,10 +19,22 @@ jest.mock('react-router', () => ({
 const ROOM = 'rooms/room1';
 const ME = 'client-me';
 
+const handData = (hands) => Object.fromEntries(Object.entries(hands).map(([id, nums]) => [id, Object.fromEntries(nums.map((n) => [n, true]))]));
+const dealtNumbers = () => Object.fromEntries(Object.entries(fakeDb.__getData('hands/room1') || {}).map(([id, hand]) => [id, Object.keys(hand).map(Number)]));
+const reveal = (uid, userName, createdAt) => ({ uid, userName, createdAt });
+
 // ค่าเริ่มต้น: เราเป็น host ของห้อง และต่อ DB ติดแล้ว
-const seedRoom = (extra = {}) => fakeDb.__reset({
+// hands = เลขในมือของแต่ละคน เช่น { [ME]: [20, 40], other: [10] } (เก็บที่ hands/room1 และ dealt บอกจำนวน)
+const seedRoom = (extra = {}, hands = {}) => fakeDb.__reset({
   '.info': { connected: true },
-  rooms: { room1: { host: 'Alice', hostId: ME, heart: 3, createdAt: 1, ...extra } },
+  rooms: {
+    room1: {
+      host: 'Alice', hostId: ME, heart: 3, createdAt: 1,
+      ...(Object.keys(hands).length > 0 && { dealt: Object.fromEntries(Object.entries(hands).map(([id, nums]) => [id, nums.length])) }),
+      ...extra,
+    },
+  },
+  ...(Object.keys(hands).length > 0 && { hands: { room1: handData(hands) } }),
 });
 
 const renderPage = async () => {
@@ -34,7 +46,7 @@ const renderPage = async () => {
 const click = async (text) => {
   userEvent.click(await screen.findByText(text));
   await act(async () => {}); // ให้ dialog (mock) resolve และเริ่ม loading ก่อน
-  await screen.findByText('หัวข้อ:'); // รอให้ loading จบ
+  await waitFor(() => expect(screen.queryByText('กำลังโหลด...')).not.toBeInTheDocument()); // รอให้ loading จบ
 };
 
 const myNumberHeadings = () => screen.queryAllByRole('heading', { level: 1 }).map((h) => Number(h.textContent));
@@ -43,7 +55,6 @@ const onlinePlayer = (name, joinedAt) => ({ name, online: true, joinedAt });
 beforeEach(() => {
   seedRoom();
   Cookies.set('userName', 'Alice');
-  Cookies.set('clientId', ME);
   showConfirm.mockReset().mockResolvedValue(true);
   showAlert.mockReset().mockResolvedValue(undefined);
   jest.spyOn(Math, 'random').mockReturnValue(0);
@@ -55,7 +66,6 @@ afterEach(() => {
   jest.useRealTimers();
   jest.restoreAllMocks();
   Cookies.remove('userName');
-  Cookies.remove('clientId');
 });
 
 describe('topic', () => {
@@ -85,16 +95,16 @@ describe('topic', () => {
     const remaining = topic.data[topic.data.length - 1];
     seedRoom({
       topic: Object.fromEntries(used.map((t, i) => [`-a${String(i).padStart(4, '0')}`, { topic: t }])),
-      numbers: { 5: { owner: 'other', userName: 'Bob', createdAt: 1 } },
-      revealNumbers: { '-a': { number: 5, userName: 'Bob' } },
-    });
+      revealNumbers: { 5: reveal('other', 'Bob', 1) },
+    }, { other: [5] });
     await renderPage();
     await click('สุ่มหัวข้อ');
 
     expect(screen.getByText(remaining)).toBeInTheDocument();
     const topics = Object.values(fakeDb.__getData(`${ROOM}/topic`)).map((t) => t.topic);
     expect(new Set(topics).size).toBe(topic.data.length);
-    expect(fakeDb.__getData(`${ROOM}/numbers`)).toBeNull();
+    expect(fakeDb.__getData('hands/room1')).toBeNull();
+    expect(fakeDb.__getData(`${ROOM}/dealt`)).toBeNull();
     expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).toBeNull();
   });
 
@@ -224,21 +234,20 @@ describe('deal numbers', () => {
         p3: onlinePlayer('Carol', 3),
         off: { name: 'Dave', online: false, joinedAt: 4 },
       },
-      revealNumbers: { '-a': { number: 9, userName: 'Bob' } },
+      revealNumbers: { 9: reveal('p2', 'Bob', 1) },
     });
     jest.restoreAllMocks(); // ใช้ Math.random จริง
     jest.spyOn(console, 'info').mockImplementation(() => {});
     await renderPage();
     await click('แจกเลข (3 คน)');
 
-    const numbers = fakeDb.__getData(`${ROOM}/numbers`);
-    const owners = Object.values(numbers).map((n) => n.owner).sort();
-    expect(owners).toEqual([ME, 'p2', 'p3'].sort());
-    expect(new Set(Object.keys(numbers)).size).toBe(3);
+    const hands = dealtNumbers();
+    expect(Object.keys(hands).sort()).toEqual([ME, 'p2', 'p3'].sort());
+    expect(new Set(Object.values(hands).flat()).size).toBe(3);
+    expect(fakeDb.__getData(`${ROOM}/dealt`)).toEqual({ [ME]: 1, p2: 1, p3: 1 });
     expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).toBeNull();
 
-    const mine = Object.entries(numbers).find(([, n]) => n.owner === ME)[0];
-    await waitFor(() => expect(myNumberHeadings()).toEqual([Number(mine)]));
+    await waitFor(() => expect(myNumberHeadings()).toEqual(hands[ME]));
   });
 
   test('host เลือกจำนวนเลขต่อคน แล้วแจกตามนั้น', async () => {
@@ -250,20 +259,20 @@ describe('deal numbers', () => {
     expect(screen.getByRole('button', { name: '3 เลข' })).toHaveAttribute('aria-pressed', 'true');
 
     await click('แจกเลข (2 คน)');
-    const numbers = Object.values(fakeDb.__getData(`${ROOM}/numbers`));
-    expect(numbers.filter((n) => n.owner === ME)).toHaveLength(3);
-    expect(numbers.filter((n) => n.owner === 'p2')).toHaveLength(3);
+    const hands = dealtNumbers();
+    expect(hands[ME]).toHaveLength(3);
+    expect(hands.p2).toHaveLength(3);
     await waitFor(() => expect(myNumberHeadings()).toHaveLength(3));
   });
 
   test('แจกใหม่กลางรอบต้องยืนยันก่อน ถ้ายกเลิกเลขเดิมไม่เปลี่ยน', async () => {
-    seedRoom({ numbers: { 42: { owner: ME, createdAt: 1 } } });
+    seedRoom({}, { [ME]: [42] });
     showConfirm.mockResolvedValue(false);
     await renderPage();
     userEvent.click(screen.getByText('แจกเลขใหม่ (1 คน)'));
 
     expect(showConfirm).toHaveBeenCalledWith(expect.stringContaining('แจกเลขใหม่ = เริ่มรอบใหม่'), expect.objectContaining({ title: 'แจกเลขใหม่?' }));
-    expect(fakeDb.__getData(`${ROOM}/numbers`)).toEqual({ 42: { owner: ME, createdAt: 1 } });
+    expect(dealtNumbers()).toEqual({ [ME]: [42] });
   });
 
   test('ผู้เล่นเยอะจนเลขไม่พอ แจ้งเตือนและไม่แจก', async () => {
@@ -273,7 +282,7 @@ describe('deal numbers', () => {
     userEvent.click(screen.getByText('แจกเลข (35 คน)'));
 
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('เกิน 100 เลข'), expect.objectContaining({ title: 'เลขไม่พอแจก' }));
-    expect(fakeDb.__getData(`${ROOM}/numbers`)).toBeNull();
+    expect(fakeDb.__getData('hands/room1')).toBeNull();
   });
 
   test('คนที่ไม่ใช่ host ไม่มีปุ่มแจกเลข เห็นข้อความรอ host แล้วได้เลขเมื่อ host แจก', async () => {
@@ -284,7 +293,7 @@ describe('deal numbers', () => {
     expect(screen.getByText('รอ Alice แจกเลข')).toBeInTheDocument();
     expect(screen.queryByText(/^แจกเลข/)).not.toBeInTheDocument();
 
-    act(() => fakeDb.__write(`${ROOM}/numbers`, { 12: { owner: ME }, 70: { owner: 'host1' } }));
+    act(() => fakeDb.__write('hands/room1', handData({ [ME]: [12], host1: [70] })));
     expect(myNumberHeadings()).toEqual([12]);
   });
 
@@ -292,8 +301,7 @@ describe('deal numbers', () => {
     seedRoom({
       hostId: 'host1',
       players: { host1: onlinePlayer('Alice', 1) },
-      numbers: { 70: { owner: 'host1' } },
-    });
+    }, { host1: [70] });
     Cookies.set('userName', 'Bob');
     await renderPage();
 
@@ -310,87 +318,104 @@ describe('deal numbers', () => {
   });
 
   test('อีกเครื่องเริ่มรอบใหม่ เลขในจอเราหายตาม', async () => {
-    seedRoom({ numbers: { 42: { owner: ME, createdAt: 1 } } });
+    seedRoom({}, { [ME]: [42] });
     await renderPage();
     expect(myNumberHeadings()).toEqual([42]);
 
-    act(() => fakeDb.__write(`${ROOM}/numbers`, null));
+    act(() => fakeDb.__write('hands/room1', null));
+    act(() => fakeDb.__write(`${ROOM}/dealt`, null));
     expect(myNumberHeadings()).toEqual([]);
   });
 
-  test('refresh แล้วยังเห็นเลขของตัวเอง', async () => {
-    seedRoom({
-      numbers: {
-        10: { owner: ME, createdAt: 30 },
-        50: { owner: 'other', createdAt: 10 },
-        70: { owner: ME, createdAt: 20 },
-      },
-    });
+  test('refresh แล้วยังเห็นเลขของตัวเอง เรียงจากน้อยไปมาก และไม่เห็นเลขของคนอื่น', async () => {
+    seedRoom({}, { [ME]: [70, 10], other: [50] });
     await renderPage();
-    expect(myNumberHeadings()).toEqual([70, 10]);
+    expect(myNumberHeadings()).toEqual([10, 70]);
+    expect(screen.queryByText('50')).not.toBeInTheDocument();
   });
 });
 
 describe('reveal', () => {
   test('เปิดเผยเลขแล้วบันทึก และเปิดซ้ำไม่ได้', async () => {
-    seedRoom({ numbers: { 42: { owner: ME, createdAt: 1 } } });
+    seedRoom({}, { [ME]: [42] });
     await renderPage();
 
     userEvent.click(screen.getByRole('heading', { level: 1, name: '42' }));
     await waitFor(() => expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).not.toBeNull());
-    expect(Object.values(fakeDb.__getData(`${ROOM}/revealNumbers`))).toEqual([
-      expect.objectContaining({ number: 42, userName: 'Alice' }),
-    ]);
+    expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).toEqual({
+      42: { userName: 'Alice', uid: ME, createdAt: expect.any(Number) },
+    });
 
     userEvent.click(screen.getAllByRole('heading', { level: 1, name: '42' })[0]);
     await waitFor(() => expect(showAlert).toHaveBeenCalledWith('เลขนี้เคยถูกเปิดเผยแล้ว'));
     expect(Object.keys(fakeDb.__getData(`${ROOM}/revealNumbers`))).toHaveLength(1);
   });
+
+  test('อีกแท็บเปิดเลขเดียวกันไปก่อน (ระหว่างที่เรายืนยันอยู่) ไม่บันทึกซ้ำและแจ้งว่าเปิดแล้ว', async () => {
+    seedRoom({}, { [ME]: [42] });
+    showConfirm.mockImplementation(async () => {
+      fakeDb.__write(`${ROOM}/revealNumbers/42`, reveal(ME, 'Alice', 5));
+      return true;
+    });
+    await renderPage();
+
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '42' }));
+    await waitFor(() => expect(showAlert).toHaveBeenCalledWith('เลขนี้เคยถูกเปิดเผยแล้ว'));
+    expect(fakeDb.__getData(`${ROOM}/revealNumbers/42`)).toEqual(reveal(ME, 'Alice', 5));
+  });
 });
 
 describe('เปิดเลขข้ามคนอื่น', () => {
-  const seedDealt = (extra = {}) => seedRoom({
-    numbers: {
-      10: { owner: 'other', createdAt: 1 },
-      20: { owner: ME, createdAt: 2 },
-      30: { owner: 'other2', createdAt: 3 },
-      40: { owner: ME, createdAt: 4 },
-    },
-    ...extra,
-  });
+  const seedDealt = (extra = {}) => seedRoom(extra, { other: [10], [ME]: [20, 40], other2: [30] });
 
   test('ไฮไลต์เลขของเราที่โดนข้าม', async () => {
-    seedDealt({ revealNumbers: { '-a': { number: 30, userName: 'Bob' } } });
+    seedDealt({ revealNumbers: { 30: reveal('other2', 'Bob', 1) } });
     await renderPage();
     expect(screen.getByRole('heading', { level: 1, name: '20' })).toHaveClass('is-skipped');
     expect(screen.getByRole('heading', { level: 1, name: '40' })).not.toHaveClass('is-skipped');
   });
 
   test('เลขที่โดนข้ามแล้วถูกเปิดทีหลัง ยังไฮไลต์ค้างไว้จนกว่าจะแจกใหม่', async () => {
-    seedDealt({ revealNumbers: { '-a': { number: 30, userName: 'Bob' }, '-b': { number: 20, userName: 'Alice' } } });
+    seedDealt({ revealNumbers: { 30: reveal('other2', 'Bob', 1), 20: reveal(ME, 'Alice', 2) } });
     await renderPage();
     expect(screen.getByRole('heading', { level: 1, name: '20' })).toHaveClass('is-skipped');
   });
 
-  test('เปิดข้ามเลขคนอื่นแล้วเขียน taunt event ให้ทุกคนเห็น', async () => {
+  test('คนอื่นเปิดข้ามเลขของเรา: เครื่องเราเขียน taunt event ให้ทุกคนเห็น', async () => {
     seedDealt();
     await renderPage();
-    userEvent.click(screen.getByRole('heading', { level: 1, name: '40' }));
+    expect(fakeDb.__getData(`${ROOM}/taunt`)).toBeNull();
+
+    act(() => fakeDb.__write(`${ROOM}/revealNumbers/30`, reveal('other2', 'Bob', 1)));
     await waitFor(() => expect(fakeDb.__getData(`${ROOM}/taunt`)).toEqual({
       id: expect.any(String), index: expect.any(Number),
     }));
   });
 
+  test('เราเปิดข้ามเลขตัวเองก็เขียน taunt', async () => {
+    seedDealt();
+    await renderPage();
+    userEvent.click(screen.getByRole('heading', { level: 1, name: '40' })); // ข้าม 20 ของเราเอง
+    await waitFor(() => expect(fakeDb.__getData(`${ROOM}/taunt`)).not.toBeNull());
+  });
+
+  test('เลขที่โดนข้ามไม่ใช่ของเรา เครื่องเราไม่เขียน taunt (เครื่องเจ้าของเลขเป็นคนเขียน)', async () => {
+    seedRoom({}, { other: [10], [ME]: [40] });
+    await renderPage();
+    act(() => fakeDb.__write(`${ROOM}/revealNumbers/30`, reveal('other2', 'Bob', 1)));
+    await act(async () => {});
+    expect(fakeDb.__getData(`${ROOM}/taunt`)).toBeNull();
+  });
+
   test('failed แล้วเปิดเลขอื่นต่อไม่แซวซ้ำ จนกว่าจะแจกเลขใหม่', async () => {
     seedDealt();
     await renderPage();
-    userEvent.click(screen.getByRole('heading', { level: 1, name: '40' })); // ข้าม 10, 30
+    act(() => fakeDb.__write(`${ROOM}/revealNumbers/30`, reveal('other2', 'Bob', 1))); // ข้าม 20 ของเรา
     await waitFor(() => expect(fakeDb.__getData(`${ROOM}/taunt`)).not.toBeNull());
     const first = fakeDb.__getData(`${ROOM}/taunt`);
 
-    act(() => fakeDb.__write(`${ROOM}/numbers/50`, { owner: ME, createdAt: 5 }));
-    act(() => fakeDb.__write(`${ROOM}/numbers/45`, { owner: 'other', createdAt: 6 }));
-    userEvent.click(await screen.findByRole('heading', { level: 1, name: '50' })); // ข้าม 45 อีก
+    act(() => fakeDb.__write(`hands/room1/${ME}/25`, true));
+    userEvent.click(await screen.findByRole('heading', { level: 1, name: '40' })); // ข้าม 25 ของเราอีก
     await waitFor(() => expect(Object.keys(fakeDb.__getData(`${ROOM}/revealNumbers`))).toHaveLength(2));
     await act(async () => {});
     expect(fakeDb.__getData(`${ROOM}/taunt`)).toEqual(first);
@@ -400,7 +425,7 @@ describe('เปิดเลขข้ามคนอื่น', () => {
   });
 
   test('เปิดเรียงถูกลำดับไม่มี taunt', async () => {
-    seedDealt({ numbers: { 10: { owner: ME, createdAt: 1 }, 20: { owner: 'other', createdAt: 2 } } });
+    seedRoom({}, { [ME]: [10], other: [20] });
     await renderPage();
     userEvent.click(screen.getByRole('heading', { level: 1, name: '10' }));
     await waitFor(() => expect(fakeDb.__getData(`${ROOM}/revealNumbers`)).not.toBeNull());
@@ -410,10 +435,7 @@ describe('เปิดเลขข้ามคนอื่น', () => {
 
 describe('เลขที่เปิดไปแล้ว', () => {
   test('การ์ดที่เปิดแล้วเป็นสีเทา ที่ยังไม่เปิดคงสีเดิม', async () => {
-    seedRoom({
-      numbers: { 10: { owner: ME, createdAt: 1 }, 20: { owner: ME, createdAt: 2 } },
-      revealNumbers: { '-a': { number: 10, userName: 'Alice' } },
-    });
+    seedRoom({ revealNumbers: { 10: reveal(ME, 'Alice', 1) } }, { [ME]: [10, 20] });
     await renderPage();
     const opened = screen.getByRole('heading', { level: 1, name: '10' });
     const unopened = screen.getByRole('heading', { level: 1, name: '20' });

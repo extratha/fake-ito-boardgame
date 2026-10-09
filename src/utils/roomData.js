@@ -13,21 +13,20 @@ export const snapshotToList = (snapshot) => {
 
 export const getLatestTopic = (topicList) => topicList[topicList.length - 1]?.topic || '';
 
-// numbers เก็บเป็น numbers/{n} = { owner, userName, createdAt }
-// รองรับข้อมูลเก่าที่เก็บเป็น numbers/{pushId} = { number, timestamp }
-export const toNumberEntries = (numberList) =>
-  numberList
-    .map((item) => ({
-      ...item,
-      number: typeof item.number === 'number' ? item.number : Number(item.id),
-    }))
-    .filter((item) => Number.isInteger(item.number));
+// เลขในมือเก็บแยกที่ hands/{roomId}/{uid}/{n} = true (rules ให้อ่านได้เฉพาะเจ้าของ) เรียงจากน้อยไปมาก
+export const handToNumbers = (hand) =>
+  Object.keys(hand || {})
+    .map(Number)
+    .filter(Number.isInteger)
+    .sort((a, b) => a - b);
 
-export const getMyNumbers = (entries, clientId) =>
-  entries
-    .filter((item) => clientId && item.owner === clientId)
-    .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
-    .map((item) => item.number);
+// revealNumbers เก็บเป็น revealNumbers/{n} = { userName, uid, createdAt } (key = เลข กันเปิดซ้ำ)
+// เรียงตามลำดับที่เปิดจริง (createdAt จาก server) / ข้อมูลเก่าเก็บเป็น push id + number
+export const toRevealList = (snapshot) =>
+  snapshotToList(snapshot)
+    .map((item) => ({ ...item, number: typeof item.number === 'number' ? item.number : Number(item.id) }))
+    .filter((item) => Number.isInteger(item.number))
+    .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
 
 // สุ่มจากตัวที่ยังไม่ถูกใช้ คืน null ถ้าไม่เหลือ
 export const pickRandomUnused = (pool, used, random = Math.random) => {
@@ -63,9 +62,8 @@ export const dealNumbers = (playerIds, perPlayer, maxNumber = 100, random = Math
   ]));
 };
 
-const highestRevealed = (revealedNumbers) => revealedNumbers.reduce((max, n) => Math.max(max, n), 0);
-
-// revealedInOrder = เลขที่เปิดแล้วเรียงตามลำดับที่เปิด
+// entries = เลขในมือเรา ({ number }) / revealedInOrder = เลขที่เปิดแล้วเรียงตามลำดับที่เปิด
+// เครื่องเรารู้แค่เลขของตัวเอง จึงหาได้เฉพาะเลขของเราที่โดนข้าม (ใช้ไฮไลต์ และเขียนข้อความแซวเมื่อมีเลขโดนข้ามเพิ่ม)
 // เลขที่โดนข้าม: ยังไม่ถูกเปิดแต่มีคนเปิดเลขที่มากกว่าไปแล้ว หรือถูกเปิดทีหลังเลขที่มากกว่า (ลงแล้วลงเลย ค้างไว้จนกว่าจะแจกใหม่)
 export const getSkippedNumbers = (entries, revealedInOrder) => {
   const skipped = new Set();
@@ -77,14 +75,6 @@ export const getSkippedNumbers = (entries, revealedInOrder) => {
   const revealed = new Set(revealedInOrder);
   entries.forEach(({ number }) => { if (number < highest && !revealed.has(number)) skipped.add(number); });
   return entries.map((e) => e.number).filter((n) => skipped.has(n));
-};
-
-// เลขที่เพิ่ง "โดนข้าม" จากการเปิด number นี้ (อยู่ระหว่างเลขสูงสุดที่เปิดมาก่อนหน้ากับ number)
-// การเปิดเลขที่ถูกข้ามอยู่แล้วทีหลัง หรือเปิดเลขที่เรียงถูกต้อง ไม่นับเป็นพลาดใหม่
-export const getNewlySkipped = (entries, revealedNumbers, number) => {
-  const revealed = new Set(revealedNumbers);
-  const previousHighest = highestRevealed(revealedNumbers);
-  return entries.map((e) => e.number).filter((n) => n > previousHighest && n < number && !revealed.has(n));
 };
 
 // สีตัวเลข 1 → 100: ฟ้า → เขียว → เหลือง → ส้ม → แดง

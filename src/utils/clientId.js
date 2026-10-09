@@ -1,11 +1,6 @@
-import Cookies from 'js-cookie';
+import { auth } from '../firebase';
 
-// id ประจำเครื่อง ใช้ระบุตัวผู้เล่น/host (refresh แล้วยังเป็นคนเดิม)
-export const getClientId = () => {
-  let clientId = Cookies.get('clientId');
-  if (!clientId) {
-    clientId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    Cookies.set('clientId', clientId, { expires: 365 });
-  }
-  return clientId;
-};
+// uid จาก Firebase Anonymous Auth ใช้ระบุตัวผู้เล่น/host (refresh แล้วยังเป็นคนเดิม)
+// App รอ sign-in เสร็จ (AuthGate) ก่อน render หน้าต่าง ๆ จึงมีค่าเสมอเมื่อหน้าเรียกใช้
+// database rules ตรวจ id นี้กับ auth.uid ของคนที่เขียน
+export const getClientId = () => auth.currentUser?.uid ?? null;

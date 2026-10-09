@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ref, set, get, onValue, push, remove, update, runTransaction, serverTimestamp } from "firebase/database";
 import { db } from '../firebase';
 import topic from '../constant/topic.json';
@@ -11,7 +11,7 @@ import CopiedIcon from "../icons/copied.svg";
 import { withTimeout, reportDbError } from '../utils/connection';
 import { showAlert, showConfirm } from '../Dialog/dialogStore';
 import { getClientId } from '../utils/clientId';
-import { snapshotToList, getLatestTopic, toNumberEntries, getMyNumbers, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, getNewlySkipped, numberColor } from '../utils/roomData';
+import { snapshotToList, getLatestTopic, handToNumbers, toRevealList, pickRandomUnused, getOnlinePlayers, dealNumbers, getSkippedNumbers, numberColor } from '../utils/roomData';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useHost } from '../hooks/useHost';
 import PlayerList, { CrownIcon } from '../PlayerList';
@@ -30,7 +30,8 @@ const topicMaxLength = topic.data.length
 function MainPage() {
   const [userName, setUserName] = useState('');
   const [clientId] = useState(getClientId);
-  const [numberEntries, setNumberEntries] = useState([]);
+  const [myNumbers, setMyNumbers] = useState([]);
+  const [dealtCounts, setDealtCounts] = useState({});
   const [revealedNumbers, setRevealedNumbers] = useState([]);
   const [numbersPerPlayer, setNumbersPerPlayer] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,10 +49,13 @@ function MainPage() {
   const players = useRoomPresence({ roomId, clientId, userName, enabled: roomExists });
   const { hostId, hostName, isHost } = useHost({ roomPath, clientId, userName, players });
 
-  const myNumbers = useMemo(() => getMyNumbers(numberEntries, clientId), [numberEntries, clientId]);
+  const handPath = `hands/${roomId}`;
   const revealedSet = useMemo(() => new Set(revealedNumbers), [revealedNumbers]);
-  const skippedNumbers = useMemo(() => new Set(getSkippedNumbers(numberEntries, revealedNumbers)), [numberEntries, revealedNumbers]);
-  const dealtOwners = useMemo(() => new Set(numberEntries.map(item => item.owner).filter(Boolean)), [numberEntries]);
+  // เครื่องเรารู้แค่เลขของตัวเอง: หาเฉพาะเลขของเราที่โดนข้าม
+  const skippedNumbers = useMemo(() => new Set(getSkippedNumbers(myNumbers.map((number) => ({ number })), revealedNumbers)), [myNumbers, revealedNumbers]);
+  // ใครได้เลขรอบนี้บ้าง (สาธารณะ แค่จำนวน ไม่บอกเลข)
+  const dealtOwners = useMemo(() => new Set(Object.keys(dealtCounts)), [dealtCounts]);
+  const hasRound = dealtOwners.size > 0;
   const onlinePlayers = getOnlinePlayers(players);
 
   const fetchUsedTopics = async () => {
@@ -67,26 +71,31 @@ function MainPage() {
   };
 
   // host แจกเลขให้ทุกคนที่ออนไลน์ในครั้งเดียว (เขียน multi-path update ครั้งเดียว เลขจึงไม่มีทางซ้ำ)
+  // เลขของแต่ละคนเก็บที่ hands/{roomId}/{uid} ซึ่ง rules ให้อ่านได้เฉพาะเจ้าของ ส่วน dealt บอกแค่ว่าใครได้กี่เลข
   const handleDealNumbers = async () => {
     if (onlinePlayers.length === 0) return;
     if (onlinePlayers.length * numbersPerPlayer > maxNumber) {
       showAlert(`ผู้เล่น ${onlinePlayers.length} คน คนละ ${numbersPerPlayer} เลข เกิน ${maxNumber} เลข ลดจำนวนเลขต่อคนก่อนนะ`, { title: 'เลขไม่พอแจก' });
       return;
     }
-    if (numberEntries.length > 0 && !(await showConfirm('แจกเลขใหม่ = เริ่มรอบใหม่ เลขเดิมและเลขที่เปิดแล้วจะหายไป ยืนยันหรือไม่', { title: 'แจกเลขใหม่?', confirmText: 'แจกใหม่' }))) {
+    if (hasRound && !(await showConfirm('แจกเลขใหม่ = เริ่มรอบใหม่ เลขเดิมและเลขที่เปิดแล้วจะหายไป ยืนยันหรือไม่', { title: 'แจกเลขใหม่?', confirmText: 'แจกใหม่' }))) {
       return;
     }
 
     setIsLoading(true);
     try {
       const dealt = dealNumbers(onlinePlayers.map(p => p.id), numbersPerPlayer, maxNumber);
-      const numbers = {};
+      const hands = {};
+      const counts = {};
       onlinePlayers.forEach((player) => {
-        dealt[player.id].forEach((number) => {
-          numbers[number] = { owner: player.id, userName: player.name, createdAt: serverTimestamp() };
-        });
+        hands[player.id] = Object.fromEntries(dealt[player.id].map((number) => [number, true]));
+        counts[player.id] = dealt[player.id].length;
       });
-      await withTimeout(update(ref(db, roomPath), { numbers, revealNumbers: null, taunt: null }), 'deal numbers');
+      await withTimeout(update(ref(db), {
+        ...roundResetUpdates(),
+        [handPath]: hands,
+        [`${roomPath}/dealt`]: counts,
+      }), 'deal numbers');
     } catch (error) {
       reportDbError(error, 'deal numbers');
     } finally {
@@ -135,37 +144,30 @@ function MainPage() {
     }
   };
 
-  const resetGameData = () =>
-    withTimeout(update(ref(db, roomPath), { numbers: null, revealNumbers: null, taunt: null }), 'reset game');
+  // ล้างรอบ: เลขในมือทุกคน ใครได้เลข เลขที่เปิด ข้อความแซว (numbers = ข้อมูลรูปแบบเก่า)
+  const roundResetUpdates = () => ({
+    [handPath]: null,
+    [`${roomPath}/dealt`]: null,
+    [`${roomPath}/numbers`]: null,
+    [`${roomPath}/revealNumbers`]: null,
+    [`${roomPath}/taunt`]: null,
+  });
+
+  const resetGameData = () => withTimeout(update(ref(db), roundResetUpdates()), 'reset game');
 
   const handleClickNumber = async (number) => {
-    const revealNumbersRef = ref(db, `${roomPath}/revealNumbers`);
+    if (revealedSet.has(number)) {
+      showAlert('เลขนี้เคยถูกเปิดเผยแล้ว');
+      return;
+    }
+    if (!(await showConfirm('เปิดเผยเลขของคุณให้สังคมรับรู้', { title: `เปิดเลข ${number}?`, confirmText: 'เปิดเลย' }))) return;
 
     try {
-      const snapshot = await withTimeout(get(revealNumbersRef), 'fetch revealed numbers');
-      const isNumberRevealed = snapshotToList(snapshot).some((item) => item.number === number);
-      if (isNumberRevealed) {
-        showAlert('เลขนี้เคยถูกเปิดเผยแล้ว');
-        return;
-      }
-
-      if (await showConfirm('เปิดเผยเลขของคุณให้สังคมรับรู้', { title: `เปิดเลข ${number}?`, confirmText: 'เปิดเลย' })) {
-        const revealedBefore = snapshotToList(snapshot).map((item) => item.number);
-        // ลงแล้วลงเลย: เก็บเลขที่เปิดไว้เสมอ แม้เปิดผิดลำดับ
-        await withTimeout(set(push(revealNumbersRef), { number, userName, createdAt: serverTimestamp() }), 'reveal number');
-        // เปิดแล้วข้ามเลขของคนอื่น = รอบนี้ failed: เขียน event ลง DB ให้ทุกคนเห็นข้อความแซวคำเดียวกัน
-        // เขียนครั้งเดียวต่อรอบ (ถ้ามีอยู่แล้วไม่ทับ) จนกว่าจะแจกเลขใหม่/รีเซ็ต แล้วค่อยแซวได้อีก
-        // แยกจากการบันทึกเลข: ข้อความแซวเขียนไม่สำเร็จก็ไม่กระทบเลขที่เปิดไปแล้ว
-        if (getNewlySkipped(numberEntries, revealedBefore, number).length > 0) {
-          const tauntRef = ref(db, `${roomPath}/taunt`);
-          try {
-            const existing = await withTimeout(get(tauntRef), 'check taunt');
-            if (!existing.exists()) await withTimeout(set(tauntRef, createTauntEvent()), 'write taunt');
-          } catch (error) {
-            reportDbError(error, 'write taunt');
-          }
-        }
-      }
+      // key = เลข และเขียนด้วย transaction: แตะรัว/เปิดสองแท็บก็บันทึกได้ครั้งเดียว (rules ก็ไม่ยอมให้เขียนทับ)
+      // ลงแล้วลงเลย: เก็บเลขที่เปิดไว้เสมอ แม้เปิดผิดลำดับ
+      const result = await withTimeout(runTransaction(ref(db, `${roomPath}/revealNumbers/${number}`), (current) =>
+        current ? undefined : { userName, uid: clientId, createdAt: serverTimestamp() }), 'reveal number');
+      if (!result.committed) showAlert('เลขนี้เคยถูกเปิดเผยแล้ว');
     } catch (error) {
       reportDbError(error, 'reveal number');
     }
@@ -226,22 +228,41 @@ function MainPage() {
     return () => unsubscribe();
   }, [roomPath]);
 
-  // เลขที่แจกแล้วทั้งห้อง: ใช้หาเลขของเรา และดูว่าใครยังไม่ได้เลข (เข้ามากลางรอบ)
+  // เลขในมือเรา (อ่านได้เฉพาะของตัวเอง)
   useEffect(() => {
-    const numbersRef = ref(db, `${roomPath}/numbers`);
-    const unsubscribe = onValue(numbersRef, (snapshot) => {
-      setNumberEntries(toNumberEntries(snapshotToList(snapshot)));
+    if (!clientId) return undefined;
+    const unsubscribe = onValue(ref(db, `${handPath}/${clientId}`), (snapshot) => {
+      setMyNumbers(handToNumbers(snapshot.val()));
     });
+    return () => unsubscribe();
+  }, [handPath, clientId]);
 
+  // ใครได้เลขรอบนี้: ดูว่าใครยังไม่ได้เลข (เข้ามากลางรอบ)
+  useEffect(() => {
+    const unsubscribe = onValue(ref(db, `${roomPath}/dealt`), (snapshot) => {
+      setDealtCounts(snapshot.val() || {});
+    });
     return () => unsubscribe();
   }, [roomPath]);
 
   useEffect(() => {
     const unsubscribe = onValue(ref(db, `${roomPath}/revealNumbers`), (snapshot) => {
-      setRevealedNumbers(snapshotToList(snapshot).map((item) => item.number));
+      setRevealedNumbers(toRevealList(snapshot).map((item) => item.number));
     });
     return () => unsubscribe();
   }, [roomPath]);
+
+  // มีคนเปิดข้ามเลขของเรา (หรือเราเปิดข้ามเลขตัวเอง) = รอบนี้ failed: เขียนข้อความแซวให้ทุกคนเห็นคำเดียวกัน
+  // เครื่องที่เลขโดนข้ามเป็นคนเขียน เพราะคนเปิดไม่รู้เลขของคนอื่น / transaction เขียนครั้งเดียวต่อรอบ จนกว่าจะแจกใหม่
+  const skippedCountRef = useRef(0);
+  useEffect(() => {
+    const count = skippedNumbers.size;
+    const increased = count > skippedCountRef.current;
+    skippedCountRef.current = count;
+    if (!increased) return;
+    withTimeout(runTransaction(ref(db, `${roomPath}/taunt`), (current) => (current ? undefined : createTauntEvent())), 'write taunt')
+      .catch((error) => reportDbError(error, 'write taunt'));
+  }, [skippedNumbers, roomPath]);
 
   useEffect(() => {
     const settingRef = ref(db, `${roomPath}/settings/numbersPerPlayer`);
@@ -269,7 +290,7 @@ function MainPage() {
   }, [roomPath, navigate]);
 
   const renderNumbersStatus = () => {
-    if (numberEntries.length === 0) {
+    if (!hasRound) {
       return <p className="hint">{isHost ? 'เลือกจำนวนเลขต่อคน แล้วกดแจกเลขได้เลย' : `รอ ${hostName || 'host'} แจกเลข`}</p>;
     }
     if (myNumbers.length === 0) {
@@ -281,10 +302,9 @@ function MainPage() {
   return (
     <div className="App">
       <div className='wrapper'>
-        {isLoading ?
-          <h3 className="loading">กำลังโหลด...</h3>
-          :
-          <div className="stack">
+        {/* ระหว่างรอ DB ไม่ซ่อนทั้งหน้า (แชทที่พิมพ์ค้าง/การแจ้งเตือนไม่หาย) แค่แจ้งสถานะและปิดปุ่มของ host */}
+        {isLoading && <p className="loading-toast" role="status">กำลังโหลด...</p>}
+        <div className="stack" aria-busy={isLoading}>
             <div className="room-header">
               <button className="button-common" onClick={() => handleClickBack()}>ย้อนกลับ</button>
               <div className="room-meta">
@@ -302,82 +322,91 @@ function MainPage() {
               </div>
             </div>
 
-            <section className="card">
-              <p className="eyebrow">หัวข้อ:</p>
-              <div className="topic-display">
-                {currentTopic
-                  ? <h2>{currentTopic}</h2>
-                  : <p className="topic-empty">{isHost ? 'ยังไม่มีหัวข้อ กดสุ่มเพื่อเริ่มเกม' : 'รอ host สุ่มหัวข้อ'}</p>}
-              </div>
-              {isHost && (
-                <div className="button-row">
-                  <button className="button-common btn-primary" onClick={handleRandomTopic}>สุ่มหัวข้อ</button>
-                  <button className="button-common" onClick={clearUsedTopics}>เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
-                </div>
-              )}
-            </section>
-
-            <section className="card">
-              <h2 className="card-title">เลขของคุณ</h2>
-
-              {isHost && (
-                <div className="deal-controls">
-                  <div className="segmented" role="group" aria-label="จำนวนเลขต่อคน">
-                    <span className="field-label">จำนวนเลขต่อคน</span>
-                    <div className="segmented-options">
-                      {numbersPerPlayerOptions.map((value) => (
-                        <button
-                          key={value}
-                          className={`segmented-option ${numbersPerPlayer === value ? 'is-active' : ''}`}
-                          aria-pressed={numbersPerPlayer === value}
-                          onClick={() => handleChangeNumbersPerPlayer(value)}
-                        >
-                          {value} เลข
-                        </button>
-                      ))}
+            <div className="room-layout">
+              <div className="room-main">
+                <section className="card">
+                  <p className="eyebrow">หัวข้อ:</p>
+                  <div className="topic-display">
+                    {currentTopic
+                      ? <h2>{currentTopic}</h2>
+                      : <p className="topic-empty">{isHost ? 'ยังไม่มีหัวข้อ กดสุ่มเพื่อเริ่มเกม' : 'รอ host สุ่มหัวข้อ'}</p>}
+                  </div>
+                  {isHost && (
+                    <div className="button-row">
+                      <button className="button-common btn-primary" onClick={handleRandomTopic} disabled={isLoading}>สุ่มหัวข้อ</button>
+                      <button className="button-common" onClick={clearUsedTopics} disabled={isLoading}>เคลียร์หัวข้อที่เคยสุ่มแล้ว</button>
                     </div>
-                  </div>
-                  <button className="button-common btn-secondary btn-lg" onClick={handleDealNumbers} disabled={onlinePlayers.length === 0}>
-                    {numberEntries.length > 0 ? 'แจกเลขใหม่' : 'แจกเลข'} ({onlinePlayers.length} คน)
-                  </button>
-                </div>
-              )}
+                  )}
+                </section>
 
-              {renderNumbersStatus()}
+                <section className="card numbers-card">
+                  <h2 className="card-title">เลขของคุณ</h2>
 
-              {myNumbers.length > 0 &&
-                <>
-                  <div className="number-tiles">
-                    {myNumbers.map((value) => (
-                      <h1
-                        key={value}
-                        className={`number-tile ${revealedSet.has(value) ? 'is-revealed' : ''} ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
-                        title={skippedNumbers.has(value) ? 'เลขนี้โดนข้ามไปแล้ว' : undefined}
-                        role="heading"
-                        aria-level={1}
-                        tabIndex={0}
-                        onClick={() => handleClickNumber(value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickNumber(value); } }}
-                        style={revealedSet.has(value) ? undefined : { color: numberColor(value) }}
-                      >
-                        {value}
-                      </h1>
-                      
-                    ))}
-                  </div>
-                  <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>
-                </>
-              }
-            </section>
+                  {isHost && (
+                    <div className="deal-controls">
+                      <div className="segmented" role="group" aria-label="จำนวนเลขต่อคน">
+                        <span className="field-label">จำนวนเลขต่อคน</span>
+                        <div className="segmented-options">
+                          {numbersPerPlayerOptions.map((value) => (
+                            <button
+                              key={value}
+                              className={`segmented-option ${numbersPerPlayer === value ? 'is-active' : ''}`}
+                              aria-pressed={numbersPerPlayer === value}
+                              onClick={() => handleChangeNumbersPerPlayer(value)}
+                            >
+                              {value} เลข
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button className="button-common btn-secondary btn-lg" onClick={handleDealNumbers} disabled={isLoading || onlinePlayers.length === 0}>
+                        {hasRound ? 'แจกเลขใหม่' : 'แจกเลข'} ({onlinePlayers.length} คน)
+                      </button>
+                    </div>
+                  )}
 
-            <HeartDisplay heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
-            <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
-            <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
+                  {renderNumbersStatus()}
+
+                  {myNumbers.length > 0 &&
+                    <>
+                      <div className="number-tiles">
+                        {myNumbers.map((value) => (
+                          <h1
+                            key={value}
+                            className={`number-tile ${revealedSet.has(value) ? 'is-revealed' : ''} ${skippedNumbers.has(value) ? 'is-skipped' : ''}`}
+                            title={skippedNumbers.has(value) ? 'เลขนี้โดนข้ามไปแล้ว' : undefined}
+                            role="heading"
+                            aria-level={1}
+                            tabIndex={0}
+                            onClick={() => handleClickNumber(value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClickNumber(value); } }}
+                            style={revealedSet.has(value) ? undefined : { color: numberColor(value) }}
+                          >
+                            {value}
+                          </h1>
+                          
+                        ))}
+                      </div>
+                      <p className="hint">แตะที่เลขเพื่อเปิดเผยให้ทุกคนเห็น</p>
+                    </>
+                  }
+                </section>
+
+                <HeartDisplay heart={heart} onReduceHeart={handleReduceHeart} onResetHeart={handleResetHeart} />
+                {/* มือถือ: CSS order ดันไปไว้หลังแชทเหมือนเดิม */}
+                <PlayerList players={players} hostId={hostId} clientId={clientId} dealtOwners={dealtOwners} />
+              </div>
+
+              {/* desktop: คอลัมน์ขวาเป็นแชทเต็มความสูง */}
+              <div className="room-side">
+                <Chat roomPath={roomPath} clientId={clientId} userName={userName} />
+              </div>
+            </div>
+
             <RevealNumbers roomId={roomId} />
             <MissTaunt roomPath={roomPath} />
             <TopicNotice roomPath={roomPath} silent={isHost} />
-          </div>
-        }
+        </div>
         {
           showNameModal && <NameModal userName={userName} setUserName={setUserName} setShowNameModal={setShowNameModal} />
         }

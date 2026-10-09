@@ -1,7 +1,7 @@
 import { db } from "../firebase"; // Assuming your db is already initialized properly
 import { useEffect, useRef, useState } from "react";
 import { ref, onValue } from "firebase/database"; // Import from firebase/database
-import { snapshotToList, numberColor } from "../utils/roomData";
+import { toRevealList, numberColor } from "../utils/roomData";
 
 export const PANEL_POSITION_KEY = 'revealPanelPosition';
 export const DEFAULT_PANEL_POSITION = { side: 'left', top: 96 }; // ใต้ header ไม่บังปุ่มย้อนกลับ/ป้าย host
@@ -66,8 +66,8 @@ const RevealNumbers = ({ roomId }) => {
     const revealNumbersRef = ref(db, `rooms/${roomId}/revealNumbers`);
 
     const unsubscribe = onValue(revealNumbersRef, (snapshot) => {
-      // เรียงตาม push key (เวลา server) ล่าสุดอยู่บน
-      setRevealNumbers(snapshotToList(snapshot).reverse());
+      // เรียงตามลำดับที่เปิด (เวลา server) ล่าสุดอยู่บน
+      setRevealNumbers(toRevealList(snapshot).reverse());
     });
 
     return () => unsubscribe();
